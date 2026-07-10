@@ -1,0 +1,41 @@
+node_modules/
+coverage/
+dist/
+.DS_Store
+.env
+.env.*
+!.env.example
+services/*/node_modules/
+packages/*/node_modules/
+services/api/data/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime/session/auth state
+auth/
+sessions/
+*.session
+*.state
+
+# Local data/media
+data/
+media/
+*.sqlite
+*.sqlite3
+*.db
+
+# Secrets and certs
+*.pem
+*.key
+*.p12
+*.crt
+
+# Editor/OS
+.idea/
+.vscode/
+Thumbs.db

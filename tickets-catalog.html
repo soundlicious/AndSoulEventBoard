@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Event System - Ticket Catalog</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #16202a;
+      --muted: #526274;
+      --line: #d7dfeb;
+      --accent: #0b7285;
+      --accent-soft: #e2f3f6;
+      --high: #b42318;
+      --medium: #b54708;
+      --low: #027a48;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Manrope", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 15%, #e6f4f1 0%, transparent 32%),
+        radial-gradient(circle at 90% 90%, #e8edff 0%, transparent 32%),
+        var(--bg);
+      line-height: 1.42;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(130deg, #123549, #0b7285 60%, #0891b2);
+      color: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 14px 36px rgba(18, 53, 73, 0.24);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 84ch;
+      color: #dff7ff;
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      color: #314355;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dot.high { background: var(--high); }
+    .dot.medium { background: var(--medium); }
+    .dot.low { background: var(--low); }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 1.12rem;
+    }
+
+    .ticket {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .ticket:last-child { margin-bottom: 0; }
+
+    .ticket h3 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+    }
+
+    .meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .tag {
+      border-radius: 999px;
+      border: 1px solid #cad5e3;
+      background: #f7faff;
+      color: #35506a;
+      font-size: 0.74rem;
+      padding: 2px 8px;
+    }
+
+    .prio {
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      padding: 2px 8px;
+      border: 1px solid;
+    }
+
+    .prio.high {
+      color: var(--high);
+      border-color: #f1b7b4;
+      background: #fff3f2;
+    }
+
+    .prio.medium {
+      color: var(--medium);
+      border-color: #f6d4ae;
+      background: #fff8f1;
+    }
+
+    .prio.low {
+      color: var(--low);
+      border-color: #a8e3c4;
+      background: #f0fff7;
+    }
+
+    .ticket p {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 0.91rem;
+    }
+
+    .ticket ul {
+      margin: 0;
+      padding-left: 18px;
+      color: #415366;
+      font-size: 0.88rem;
+    }
+
+    .ticket li { margin-bottom: 4px; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #edf3fb;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Ticket Catalog - WhatsApp DM Event Pipeline</h1>
+      <p>
+        Full ticket list with clear scope and acceptance criteria so you can import into your Kanban tool without relying on a pre-drawn board.
+        IDs are stable and grouped by epic.
+      </p>
+    </section>
+
+    <section class="legend">
+      <span class="pill"><span class="dot high"></span> High priority</span>
+      <span class="pill"><span class="dot medium"></span> Medium priority</span>
+      <span class="pill"><span class="dot low"></span> Low priority</span>
+      <span class="pill">Sizes: XS / S / M / L</span>
+      <span class="pill">Status starts as Backlog</span>
+    </section>
+
+    <section class="section">
+      <h2>Epic A - Platform & Repository Setup</h2>
+
+      <article class="ticket">
+        <h3>EVT-001 - Initialize repository structure for bot, api, display, and shared packages</h3>
+        <div class="meta">
+          <span class="tag">Epic A</span><span class="tag">Platform</span><span class="tag">Size: S</span><span class="prio high">High</span>
+        </div>
+        <p>Create a predictable mono-structure to avoid coupling and make Docker builds straightforward.</p>
+        <ul>
+          <li>Folders exist: <code>services/bot</code>, <code>services/api</code>, <code>services/display</code>, <code>packages/shared</code>.</li>
+          <li>Each service has its own README and startup command.</li>
+          <li>Shared package exports event schema types.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-002 - Create docker-compose baseline for local development</h3>
+        <div class="meta">
+          <span class="tag">Epic A</span><span class="tag">DevOps</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Define one-command local startup for full stack validation.</p>
+        <ul>
+          <li><code>docker compose up</code> starts bot, api, display, and storage dependencies.</li>
+          <li>Named volumes declared for WhatsApp auth and DB persistence.</li>
+          <li>Healthchecks configured for API and display services.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-003 - Add environment config templates and validation</h3>
+        <div class="meta">
+          <span class="tag">Epic A</span><span class="tag">Config</span><span class="tag">Size: S</span><span class="prio high">High</span>
+        </div>
+        <p>Prevent runtime crashes from missing secrets or invalid config.</p>
+        <ul>
+          <li>Create <code>.env.example</code> with all required keys and comments.</li>
+          <li>Startup validates required env vars and fails with explicit error.</li>
+          <li>Support split mode toggles for A/B parser assignment.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Epic B - WhatsApp Bot Ingestion (Baileys)</h2>
+
+      <article class="ticket">
+        <h3>EVT-004 - Implement Baileys authentication and reconnect lifecycle</h3>
+        <div class="meta">
+          <span class="tag">Epic B</span><span class="tag">Bot</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Keep bot session durable across restarts and temporary disconnects.</p>
+        <ul>
+          <li>Session credentials persist to volume-backed path.</li>
+          <li>Reconnect logic handles recoverable disconnect reasons.</li>
+          <li>Connection state transitions are logged with request identifiers.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-005 - DM-only message filter and sender allow-list</h3>
+        <div class="meta">
+          <span class="tag">Epic B</span><span class="tag">Bot</span><span class="tag">Size: S</span><span class="prio high">High</span>
+        </div>
+        <p>Restrict intake to intended users and avoid accidental group ingestion loops.</p>
+        <ul>
+          <li>Only private chat messages enter parse pipeline.</li>
+          <li>Optional allow-list mode blocks unknown senders.</li>
+          <li>Rejected messages are logged with reason and sender hash.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-006 - Build idempotent message intake record</h3>
+        <div class="meta">
+          <span class="tag">Epic B</span><span class="tag">Reliability</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Ensure duplicate events are not created when WhatsApp retries or restarts occur.</p>
+        <ul>
+          <li>Store unique key using sender JID + message ID.</li>
+          <li>Duplicate payloads are no-op and acknowledged in logs.</li>
+          <li>Raw text is stored temporarily for parser debugging.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Epic C - Parsing A/B Engine</h2>
+
+      <article class="ticket">
+        <h3>EVT-007 - Implement parser A (rule-based extraction)</h3>
+        <div class="meta">
+          <span class="tag">Epic C</span><span class="tag">Parser A</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Create deterministic extraction for title/date/time/location with confidence score.</p>
+        <ul>
+          <li>Regex rules cover at least 10 common message formats.</li>
+          <li>Date parsing handles locale ambiguity and timezone defaults.</li>
+          <li>Output shape matches canonical event schema.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-008 - Implement parser B (LLM structured output)</h3>
+        <div class="meta">
+          <span class="tag">Epic C</span><span class="tag">Parser B</span><span class="tag">Size: L</span><span class="prio high">High</span>
+        </div>
+        <p>Use LLM API with strict JSON response contract and robust error handling.</p>
+        <ul>
+          <li>Prompt includes schema, examples, and invalid output guardrails.</li>
+          <li>On malformed output, one retry is attempted before fallback.</li>
+          <li>Token usage and latency are captured in experiment logs.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-009 - Build A/B router (random and sender-sticky modes)</h3>
+        <div class="meta">
+          <span class="tag">Epic C</span><span class="tag">Experiment</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Assign each DM to parser variant A or B based on runtime strategy.</p>
+        <ul>
+          <li>Supports <code>random_50_50</code> and <code>sender_sticky</code> assignment.</li>
+          <li>Assignment is included in parse log payload.</li>
+          <li>Mode can be changed by env var without code changes.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-010 - Parse quality evaluator and confidence thresholds</h3>
+        <div class="meta">
+          <span class="tag">Epic C</span><span class="tag">Quality</span><span class="tag">Size: M</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Normalize parse quality scoring and determine confirmation requirements.</p>
+        <ul>
+          <li>Defines thresholds for auto-publish, confirm-needed, and reject.</li>
+          <li>Tracks required field coverage and parser-specific errors.</li>
+          <li>Provides single confidence output regardless of parser variant.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Epic D - Validation, Storage, and Publishing</h2>
+
+      <article class="ticket">
+        <h3>EVT-011 - Canonical event schema + persistence model</h3>
+        <div class="meta">
+          <span class="tag">Epic D</span><span class="tag">API</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Define persistent model for events, parse metadata, and publication status.</p>
+        <ul>
+          <li>Schema includes source message IDs and parser variant metadata.</li>
+          <li>Status lifecycle supports <code>draft</code>, <code>confirmed</code>, <code>published</code>, <code>failed</code>.</li>
+          <li>Uniqueness constraints prevent duplicate event creation.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-012 - Confirmation DM workflow for low-confidence events</h3>
+        <div class="meta">
+          <span class="tag">Epic D</span><span class="tag">Bot</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Ask user to confirm or correct extracted fields before publishing.</p>
+        <ul>
+          <li>Bot sends editable event summary in DM.</li>
+          <li>User reply updates the same event record.</li>
+          <li>Time-bound pending confirmations can be expired automatically.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-013 - Publish event to configured WhatsApp group</h3>
+        <div class="meta">
+          <span class="tag">Epic D</span><span class="tag">Bot</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Post final event message to a group and persist publication outcome.</p>
+        <ul>
+          <li>Message template contains title, date/time, location, and notes.</li>
+          <li>Handles temporary send failures with retry policy.</li>
+          <li>Stored audit includes published group JID and message ID.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-014 - Expose REST endpoints for event listing and creation</h3>
+        <div class="meta">
+          <span class="tag">Epic D</span><span class="tag">API</span><span class="tag">Size: S</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Provide display and integration clients a stable event API surface.</p>
+        <ul>
+          <li><code>GET /events</code> returns upcoming events sorted by start time.</li>
+          <li><code>POST /events</code> validates payload against schema.</li>
+          <li>All responses include correlation id for tracing.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Epic E - Carousel Display Experience</h2>
+
+      <article class="ticket">
+        <h3>EVT-015 - Implement display web app with event carousel</h3>
+        <div class="meta">
+          <span class="tag">Epic E</span><span class="tag">Display</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Show upcoming events in rotating slides optimized for TV/kiosk readability.</p>
+        <ul>
+          <li>Large typography and high-contrast cards for distance viewing.</li>
+          <li>Slide interval configurable per device.</li>
+          <li>Graceful empty state when no upcoming events exist.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-016 - Add real-time or polling refresh for event updates</h3>
+        <div class="meta">
+          <span class="tag">Epic E</span><span class="tag">Display</span><span class="tag">Size: S</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Ensure new events appear on screens without manual browser reload.</p>
+        <ul>
+          <li>Implements polling or websocket updates with reconnect behavior.</li>
+          <li>No flicker when updated dataset is applied.</li>
+          <li>Supports intermittent network recovery on Raspberry Pi.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-017 - Kiosk mode deployment instructions for Raspberry Pi</h3>
+        <div class="meta">
+          <span class="tag">Epic E</span><span class="tag">Ops</span><span class="tag">Size: S</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Document browser autostart and full-screen settings for unattended screens.</p>
+        <ul>
+          <li>Includes Chromium startup script and systemd unit example.</li>
+          <li>Instructions cover both local and remote display URLs.</li>
+          <li>Recovery steps included for boot failures.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>Epic F - Observability, Security, and Ops</h2>
+
+      <article class="ticket">
+        <h3>EVT-018 - Add parse experiment logging and metrics endpoint</h3>
+        <div class="meta">
+          <span class="tag">Epic F</span><span class="tag">Observability</span><span class="tag">Size: M</span><span class="prio high">High</span>
+        </div>
+        <p>Capture and expose A/B experiment metrics for decision-making.</p>
+        <ul>
+          <li>Tracks parse validity, correction rate, p95 latency, and estimated cost.</li>
+          <li><code>GET /experiments/metrics</code> returns aggregated counters.</li>
+          <li>Metrics can be filtered by date range and variant.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-019 - Secrets and PII handling policy</h3>
+        <div class="meta">
+          <span class="tag">Epic F</span><span class="tag">Security</span><span class="tag">Size: S</span><span class="prio high">High</span>
+        </div>
+        <p>Protect LLM keys and reduce personal data exposure in stored logs.</p>
+        <ul>
+          <li>Sender identifiers are hashed in analytics datasets.</li>
+          <li>Raw message retention policy is documented and enforced.</li>
+          <li>Production secrets are not committed and have rotation guidance.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-020 - Multi-arch image strategy for amd64 and arm64</h3>
+        <div class="meta">
+          <span class="tag">Epic F</span><span class="tag">DevOps</span><span class="tag">Size: M</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Guarantee same Compose stack works on laptop and Raspberry Pi devices.</p>
+        <ul>
+          <li>Build pipeline publishes multi-arch images or architecture-specific tags.</li>
+          <li>Runtime dependencies are validated for ARM compatibility.</li>
+          <li>Deployment docs include Pi-specific resource limits.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-021 - End-to-end smoke tests in Docker Compose</h3>
+        <div class="meta">
+          <span class="tag">Epic F</span><span class="tag">QA</span><span class="tag">Size: M</span><span class="prio medium">Medium</span>
+        </div>
+        <p>Automate basic flow verification from DM intake to display visibility.</p>
+        <ul>
+          <li>Test fixture simulates inbound DM payload.</li>
+          <li>Expected event appears in API and display endpoint output.</li>
+          <li>Failure report includes service logs and parser variant used.</li>
+        </ul>
+      </article>
+
+      <article class="ticket">
+        <h3>EVT-022 - Backup and restore runbook for auth state and database</h3>
+        <div class="meta">
+          <span class="tag">Epic F</span><span class="tag">Ops</span><span class="tag">Size: S</span><span class="prio low">Low</span>
+        </div>
+        <p>Document disaster recovery for WhatsApp sessions and event persistence.</p>
+        <ul>
+          <li>Runbook includes scheduled volume backup command examples.</li>
+          <li>Restore procedure tested on a clean machine.</li>
+          <li>Recovery time objective and caveats are explicit.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

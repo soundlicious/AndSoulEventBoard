@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Event System Architecture</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #16202a;
+      --muted: #546170;
+      --line: #d6deea;
+      --brand: #0f766e;
+      --brand-soft: #def7f3;
+      --code: #0f172a;
+      --code-bg: #edf2f8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 10%, #d8efe9 0%, transparent 28%),
+        radial-gradient(circle at 86% 90%, #e6ebff 0%, transparent 34%),
+        var(--bg);
+      line-height: 1.45;
+    }
+
+    .wrap {
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      border-radius: 18px;
+      padding: 22px;
+      color: #fff;
+      background: linear-gradient(140deg, #134e4a, #0f766e 60%, #0d9488);
+      box-shadow: 0 12px 30px rgba(16, 94, 89, 0.24);
+      margin-bottom: 16px;
+    }
+
+    .hero h1 {
+      margin: 0 0 6px;
+      font-size: 1.7rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #d8faf4;
+      max-width: 80ch;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 12px;
+      margin: 14px 0 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 1.15rem;
+    }
+
+    .note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid #a7e6dc;
+      border-radius: 10px;
+      background: var(--brand-soft);
+      color: #0d5c56;
+      font-size: 0.92rem;
+    }
+
+    .mermaid {
+      background: #fbfdfc;
+      border: 1px solid #d6ece8;
+      border-radius: 10px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.93rem;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+    }
+
+    th {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--code-bg);
+      color: var(--code);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .footer {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Architecture + Compose + API Contract</h1>
+      <p>
+        Single-page reference to discuss implementation details before coding: topology, Docker Compose service map,
+        and initial API/data contracts for events and A/B parser experiment logs.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Core Services</h2>
+        <p><code>bot</code> (Baileys intake), <code>api</code> (event lifecycle), <code>display</code> (carousel web app), <code>db</code> (SQLite/Postgres).</p>
+      </article>
+      <article class="card">
+        <h2>Parsing Modes</h2>
+        <p>Variant A: deterministic rules. Variant B: LLM structured extraction with schema validation and fallback.</p>
+      </article>
+      <article class="card">
+        <h2>Deployment Targets</h2>
+        <p>Compose first on local machine, then same topology ported to Raspberry Pi with ARM-ready images.</p>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>1) System Architecture Diagram (Mermaid)</h2>
+      <div class="mermaid">
+flowchart LR
+    U[User via WhatsApp DM] --> B[Bot Service\nNode + Baileys]
+    B --> R{AB Router}
+    R --> A[Parser A\nRule-based]
+    R --> L[Parser B\nLLM API]
+    A --> V[Validator + Normalizer]
+    L --> V
+    V --> DB[(Events DB)]
+    V --> G[WhatsApp Group Publisher]
+    DB --> API[REST/WebSocket API]
+    API --> D1[Display Device #1\nBrowser/Kiosk]
+    API --> D2[Display Device #2\nRaspberry Pi]
+    API --> D3[Display Device #N\nRaspberry Pi]
+    B --> X[(Experiment Logs)]
+    R --> X
+    V --> X
+    L --> X
+      </div>
+      <p class="note">
+        The diagram auto-renders if internet is available (Mermaid CDN below). If not, this source still stays readable as plain text.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>2) Suggested Docker Compose Service Map</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Image/Build</th>
+            <th>Ports</th>
+            <th>Volumes</th>
+            <th>Main Env Vars</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>bot</code></td>
+            <td>Node app (<code>./services/bot</code>)</td>
+            <td>-</td>
+            <td><code>wa_auth:/app/auth</code></td>
+            <td><code>WA_GROUP_JID</code>, <code>PARSER_SPLIT_MODE</code>, <code>API_BASE_URL</code></td>
+          </tr>
+          <tr>
+            <td><code>api</code></td>
+            <td>Node app (<code>./services/api</code>)</td>
+            <td><code>8080:8080</code></td>
+            <td><code>events_data:/app/data</code></td>
+            <td><code>DATABASE_URL</code>, <code>LLM_API_KEY</code>, <code>AB_ASSIGNMENT_MODE</code></td>
+          </tr>
+          <tr>
+            <td><code>display</code></td>
+            <td>Static app (<code>./services/display</code>)</td>
+            <td><code>3000:3000</code></td>
+            <td>-</td>
+            <td><code>PUBLIC_API_URL</code>, <code>CAROUSEL_INTERVAL_MS</code></td>
+          </tr>
+          <tr>
+            <td><code>db</code> (optional if Postgres)</td>
+            <td><code>postgres:16-alpine</code></td>
+            <td><code>5432:5432</code></td>
+            <td><code>pg_data:/var/lib/postgresql/data</code></td>
+            <td><code>POSTGRES_DB</code>, <code>POSTGRES_USER</code>, <code>POSTGRES_PASSWORD</code></td>
+          </tr>
+          <tr>
+            <td><code>watchtower</code> (optional)</td>
+            <td><code>containrrr/watchtower</code></td>
+            <td>-</td>
+            <td><code>/var/run/docker.sock</code></td>
+            <td><code>WATCHTOWER_POLL_INTERVAL</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        Start with SQLite in <code>api</code> for easiest local bring-up. Move to Postgres when you need concurrent writers, analytics, or backups.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>3) Initial API Contract</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>Purpose</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/health</code></td>
+            <td>GET</td>
+            <td>Service health</td>
+            <td>Used by Compose health checks</td>
+          </tr>
+          <tr>
+            <td><code>/events</code></td>
+            <td>GET</td>
+            <td>List upcoming events</td>
+            <td>For display carousel</td>
+          </tr>
+          <tr>
+            <td><code>/events</code></td>
+            <td>POST</td>
+            <td>Create canonical event</td>
+            <td>Called after parser + validation</td>
+          </tr>
+          <tr>
+            <td><code>/events/:id/publish</code></td>
+            <td>POST</td>
+            <td>Publish event message to group</td>
+            <td>Manual retry path</td>
+          </tr>
+          <tr>
+            <td><code>/experiments/parses</code></td>
+            <td>POST</td>
+            <td>Store A/B parse run</td>
+            <td>Input text, variant, metrics, outcome</td>
+          </tr>
+          <tr>
+            <td><code>/experiments/metrics</code></td>
+            <td>GET</td>
+            <td>Aggregated parser stats</td>
+            <td>Success rate, p95 latency, cost</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>4) Event Payload Contract (JSON)</h2>
+      <pre><code>{
+  "id": "evt_01J2...",
+  "title": "Community Dinner",
+  "description": "Bring a dish to share",
+  "startAt": "2026-07-20T19:30:00+02:00",
+  "endAt": "2026-07-20T22:00:00+02:00",
+  "location": "Main Hall",
+  "organizerName": "Pablo",
+  "source": {
+    "channel": "whatsapp_dm",
+    "senderJid": "346XXXXXXXX@s.whatsapp.net",
+    "messageId": "ABCD1234",
+    "rawText": "Dinner next Friday 19:30 in Main Hall"
+  },
+  "parse": {
+    "variant": "A",
+    "confidence": 0.89,
+    "needsConfirmation": false
+  },
+  "status": "published",
+  "publishedGroupJid": "1203630XXXXXXXX@g.us",
+  "createdAt": "2026-07-09T15:45:12Z",
+  "updatedAt": "2026-07-09T15:46:02Z"
+}</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>5) Parser Experiment Log Contract (JSON)</h2>
+      <pre><code>{
+  "id": "exp_01J2...",
+  "receivedAt": "2026-07-09T15:44:59Z",
+  "assignmentMode": "sender_sticky",
+  "variant": "B",
+  "senderJidHash": "sha256:...",
+  "messageLength": 83,
+  "llmModel": "gpt-4.1-mini",
+  "latencyMs": 1240,
+  "tokenInput": 290,
+  "tokenOutput": 145,
+  "estimatedCostUsd": 0.0021,
+  "valid": true,
+  "confidence": 0.93,
+  "requiredFieldsPresent": ["title", "startAt"],
+  "correctionRequested": false,
+  "eventId": "evt_01J2..."
+}</code></pre>
+      <p class="note">
+        Keep personally identifiable details minimized in analytics. Prefer hashed sender IDs and short retention windows for raw text.
+      </p>
+    </section>
+
+    <p class="footer">
+      Next handoff artifact suggestion: one <code>compose-example.yml</code> plus <code>.env.example</code> derived from this page.
+    </p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+    }
+  </script>
+</body>
+</html>

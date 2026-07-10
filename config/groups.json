@@ -1,0 +1,18 @@
+{
+  "organiserMentions": {
+    "pablo": "34600000001@s.whatsapp.net",
+    "maria": "34600000002@s.whatsapp.net"
+  },
+  "groups": [
+    {
+      "name": "CoLiving Main",
+      "jid": "1203630XXXXXXXX@g.us",
+      "enabled": true
+    },
+    {
+      "name": "CoLiving Backup",
+      "jid": "1203630YYYYYYYY@g.us",
+      "enabled": false
+    }
+  ]
+}

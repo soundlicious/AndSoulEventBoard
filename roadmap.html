@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Event System Roadmap</title>
+  <style>
+    :root {
+      --bg: #f7f7f2;
+      --paper: #ffffff;
+      --ink: #1d2a35;
+      --muted: #536271;
+      --accent: #0f766e;
+      --accent-soft: #dff5f2;
+      --line: #d7e0e8;
+      --warn: #9a3412;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Source Sans 3", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 15%, #e7f4f2 0%, transparent 35%),
+        radial-gradient(circle at 90% 85%, #f4ece2 0%, transparent 30%),
+        var(--bg);
+      line-height: 1.45;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(140deg, #10344a, #0f766e 60%, #0d9488);
+      color: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 14px 40px rgba(16, 52, 74, 0.25);
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 1.9rem;
+      letter-spacing: 0.2px;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #ddf9f6;
+      max-width: 76ch;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .meta .item {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .meta .item strong {
+      display: block;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }
+
+    h2 {
+      margin: 24px 0 12px;
+      font-size: 1.2rem;
+    }
+
+    .phase {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .phase .top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .phase h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid #8ed8d1;
+      background: var(--accent-soft);
+      color: #0b5c55;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 10px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .card h4 {
+      margin: 0 0 6px;
+      font-size: 0.98rem;
+    }
+
+    .card ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .risks {
+      background: #fff9f5;
+      border: 1px solid #f7d7c6;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .risks li {
+      margin-bottom: 6px;
+      color: var(--warn);
+    }
+
+    .footer {
+      margin-top: 26px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #f2f6fa;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="hero">
+      <h1>Roadmap: WhatsApp DM to Event Carousel</h1>
+      <p>
+        Build a system where a user sends an event by WhatsApp DM, your bot parses it with A/B logic (simple parser vs LLM),
+        posts the validated event to a WhatsApp Group, and displays event slides in a browser carousel running on Raspberry Pi devices.
+      </p>
+    </section>
+
+    <section class="meta">
+      <div class="item"><strong>Core Stack</strong>Node.js + Baileys + Docker Compose</div>
+      <div class="item"><strong>AB Test</strong>Path A: rule parser / Path B: LLM API</div>
+      <div class="item"><strong>Display</strong>Web carousel + optional kiosk mode</div>
+      <div class="item"><strong>Target</strong>Local dev first, Raspberry Pi deployment next</div>
+    </section>
+
+    <h2>Execution Plan</h2>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 0 - Foundation & Architecture</h3>
+        <span class="tag">Week 1</span>
+      </div>
+      <p>Define boundaries, folders, contracts, and local orchestration.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Monorepo structure: <code>bot</code>, <code>api</code>, <code>display</code>, <code>shared</code>.</li>
+            <li><code>docker-compose.yml</code> for local full stack.</li>
+            <li>Event schema: title, start/end, location, notes, source metadata.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Success Criteria</h4>
+          <ul>
+            <li>All services start with one command.</li>
+            <li>Health checks are exposed and visible in logs.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 1 - WhatsApp Bot Ingestion (Baileys)</h3>
+        <span class="tag">Week 1-2</span>
+      </div>
+      <p>Implement DM message intake and normalize into parse requests.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Baileys connection lifecycle (auth persistence + reconnect behavior).</li>
+            <li>DM-only command path and sender allow-list option.</li>
+            <li>Raw message capture with idempotency key.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Notes</h4>
+          <ul>
+            <li>Reference: <code>https://baileys.wiki/docs/intro/</code>.</li>
+            <li>Persist auth/session on named volume for restart safety.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 2 - Parsing A/B Test Engine</h3>
+        <span class="tag">Week 2</span>
+      </div>
+      <p>Route each parse request to a parser variant and compare output quality.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Variant A (Simple Parser)</h4>
+          <ul>
+            <li>Regex + date normalization + fallback defaults.</li>
+            <li>Confidence score from required field coverage.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Variant B (LLM API)</h4>
+          <ul>
+            <li>Prompt with strict JSON schema and examples.</li>
+            <li>Retry with guardrails if malformed response.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Experimentation</h4>
+          <ul>
+            <li>Split strategy: random 50/50 or sender-sticky assignment.</li>
+            <li>Track latency, parse validity, human correction rate.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 3 - Validation, Storage, and Group Publishing</h3>
+        <span class="tag">Week 2-3</span>
+      </div>
+      <p>Validate event payloads, store canonical events, and publish to WhatsApp Group.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Validation pipeline with user feedback loop on invalid fields.</li>
+            <li>Persistent DB (SQLite for local, Postgres optional for growth).</li>
+            <li>Formatted group announcement template.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Success Criteria</h4>
+          <ul>
+            <li>New valid event appears in DB and group chat.</li>
+            <li>Duplicate DM does not create duplicate events.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 4 - Carousel Display Service</h3>
+        <span class="tag">Week 3</span>
+      </div>
+      <p>Build a lightweight web UI to show upcoming events on one or many devices.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Auto-refresh event API polling or websocket updates.</li>
+            <li>Carousel with duration, transition, and fallback states.</li>
+            <li>Responsive kiosk-friendly mode for TV/Pi displays.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Success Criteria</h4>
+          <ul>
+            <li>Same display URL works on local and remote Pi devices.</li>
+            <li>Updated events appear without manual browser refresh.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <article class="phase">
+      <div class="top">
+        <h3>Phase 5 - Raspberry Pi Hardening & Operations</h3>
+        <span class="tag">Week 4</span>
+      </div>
+      <p>Ensure reproducible deployment on ARM devices and stable runtime behavior.</p>
+      <div class="grid">
+        <section class="card">
+          <h4>Deliverables</h4>
+          <ul>
+            <li>Multi-arch images (amd64 + arm64) or Pi-native builds.</li>
+            <li>Compose profile for low-resource mode.</li>
+            <li>Backup strategy for auth data + event database.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h4>Observability</h4>
+          <ul>
+            <li>Structured logs with request ids across services.</li>
+            <li>Basic dashboard: parse success, AB distribution, bot uptime.</li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <h2>Key Risks & Mitigations</h2>
+    <section class="risks">
+      <ul>
+        <li>WhatsApp session invalidation - keep auth state volume-backed and alert on reconnect loops.</li>
+        <li>LLM cost/latency spikes - gate with fallback to parser A and enforce token limits.</li>
+        <li>Date parsing ambiguity - send confirmation DM when confidence is below threshold.</li>
+        <li>Pi resource constraints - keep display app static-first and trim container base images.</li>
+      </ul>
+    </section>
+
+    <p class="footer">
+      Tip: Keep roadmap and tickets in sync by using stable IDs (example: <code>EVT-012</code>) across both pages.
+    </p>
+  </main>
+</body>
+</html>

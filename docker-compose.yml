@@ -1,0 +1,101 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - API_PORT=${API_PORT:-8080}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/events.sqlite}
+      - AB_ASSIGNMENT_MODE=${AB_ASSIGNMENT_MODE:-sender_sticky}
+      - AB_FORCE_VARIANT=${AB_FORCE_VARIANT:-}
+      - DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE:-Europe/Madrid}
+      - CONFIDENCE_AUTO_PUBLISH=${CONFIDENCE_AUTO_PUBLISH:-0.85}
+      - CONFIDENCE_CONFIRM=${CONFIDENCE_CONFIRM:-0.60}
+      - LLM_API_URL=${LLM_API_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - MEDIA_DIR=${MEDIA_DIR:-/app/data/media}
+      - MAX_MEDIA_BYTES=${MAX_MEDIA_BYTES:-20971520}
+      - API_MAX_BODY_BYTES=${API_MAX_BODY_BYTES:-25165824}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-300000}
+      - RATE_LIMIT_MAX_PER_SENDER=${RATE_LIMIT_MAX_PER_SENDER:-10}
+      - RATE_LIMIT_MAX_GLOBAL=${RATE_LIMIT_MAX_GLOBAL:-200}
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+      - TZ=${TZ:-Europe/Madrid}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - events_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: services/bot/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - BOT_NAME=${BOT_NAME:-event-bot}
+      - API_BASE_URL=${API_BASE_URL:-http://api:8080}
+      - PARSER_SPLIT_MODE=${PARSER_SPLIT_MODE:-sender_sticky}
+      - ENABLE_SENDER_ALLOWLIST=${ENABLE_SENDER_ALLOWLIST:-false}
+      - SENDER_ALLOWLIST=${SENDER_ALLOWLIST}
+      - SIMULATE_INCOMING=${SIMULATE_INCOMING:-true}
+      - GROUPS_CONFIG_PATH=${GROUPS_CONFIG_PATH:-/app/config/groups.json}
+      - ENABLE_BAILEYS=${ENABLE_BAILEYS:-false}
+      - BAILEYS_AUTH_DIR=${BAILEYS_AUTH_DIR:-/app/auth/state}
+      - BOT_ALLOW_FROM_ME=${BOT_ALLOW_FROM_ME:-false}
+      - BOT_IGNORE_OLD_MESSAGES=${BOT_IGNORE_OLD_MESSAGES:-true}
+      - BOT_DM_OBSERVE_MODE=${BOT_DM_OBSERVE_MODE:-all}
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+      - TZ=${TZ:-Europe/Madrid}
+    volumes:
+      - wa_auth:/app/auth
+      - ./config:/app/config:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  display:
+    build:
+      context: .
+      dockerfile: services/display/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DISPLAY_PORT=${DISPLAY_PORT:-3000}
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - DISPLAY_API_SERVER_URL=${DISPLAY_API_SERVER_URL:-http://api:8080}
+      - PUBLIC_MEDIA_URL=${PUBLIC_MEDIA_URL:-http://localhost:8080}
+      - CAROUSEL_INTERVAL_MS=${CAROUSEL_INTERVAL_MS:-8000}
+      - DISPLAY_MAX_DAYS_AHEAD=${DISPLAY_MAX_DAYS_AHEAD:-30}
+      - DISPLAY_ENABLE_DEBUG=${DISPLAY_ENABLE_DEBUG:-true}
+      - DISPLAY_PROXY_MAX_BODY_BYTES=${DISPLAY_PROXY_MAX_BODY_BYTES:-25165824}
+      - DISPLAY_PROXY_MAX_MEDIA_BYTES=${DISPLAY_PROXY_MAX_MEDIA_BYTES:-20971520}
+      - TZ=${TZ:-Europe/Madrid}
+    ports:
+      - "${DISPLAY_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  wa_auth:
+  events_data:

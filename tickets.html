@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp Event System Tickets</title>
+  <style>
+    :root {
+      --bg: #f2f4f7;
+      --panel: #ffffff;
+      --ink: #17212b;
+      --muted: #556271;
+      --line: #d4dce6;
+      --accent: #1d4ed8;
+      --todo: #fef3c7;
+      --doing: #dbeafe;
+      --done: #dcfce7;
+      --blocked: #fee2e2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(130deg, #eaf0ff 0%, transparent 35%),
+        linear-gradient(320deg, #fef3e7 0%, transparent 30%),
+        var(--bg);
+    }
+
+    .wrap {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .header {
+      background: linear-gradient(120deg, #1f2937, #1d4ed8);
+      color: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 12px 28px rgba(31, 41, 55, 0.2);
+    }
+
+    .header h1 {
+      margin: 0 0 6px;
+      font-size: 1.6rem;
+    }
+
+    .header p {
+      margin: 0;
+      color: #dbe7ff;
+      max-width: 70ch;
+      line-height: 1.45;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 1120px) {
+      .board {
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .column {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      min-height: 340px;
+    }
+
+    .column h2 {
+      margin: 4px 4px 10px;
+      font-size: 0.95rem;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .ticket {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .ticket:last-child {
+      margin-bottom: 0;
+    }
+
+    .ticket h3 {
+      margin: 0 0 6px;
+      font-size: 0.95rem;
+      line-height: 1.3;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .pill {
+      border: 1px solid #c4d0dd;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.74rem;
+      color: #354454;
+      background: #f8fbff;
+    }
+
+    .ticket p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    .todo { background: var(--todo); }
+    .doing { background: var(--doing); }
+    .done { background: var(--done); }
+    .blocked { background: var(--blocked); }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #eef2f7;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="header">
+      <h1>Tickets: WhatsApp Event Bot + Carousel</h1>
+      <p>
+        Starter tickets for your future Kanban board. IDs are stable so you can move them into Jira, Linear, GitHub Projects,
+        or a physical board later.
+      </p>
+    </section>
+
+    <section class="board">
+      <article class="column todo">
+        <h2>To Do</h2>
+
+        <div class="ticket">
+          <h3>EVT-001 - Bootstrap repo and Docker Compose services</h3>
+          <div class="meta">
+            <span class="pill">Platform</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Create services for <code>bot</code>, <code>api</code>, <code>display</code>, and DB with named volumes and health checks.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-002 - Implement Baileys auth/session persistence</h3>
+          <div class="meta">
+            <span class="pill">Bot</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Persist credentials to disk volume and handle reconnect lifecycle for container restarts.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-003 - Ingest DM messages and normalize parse request</h3>
+          <div class="meta">
+            <span class="pill">Bot</span>
+            <span class="pill">S</span>
+          </div>
+          <p>Filter private chats only, capture metadata, and enqueue event parse payload with idempotency key.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-004 - Build parser A (rule-based)</h3>
+          <div class="meta">
+            <span class="pill">Parsing</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Regex/date parser with confidence score and validation errors for missing title/date/time fields.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-005 - Build parser B (LLM API structured output)</h3>
+          <div class="meta">
+            <span class="pill">Parsing</span>
+            <span class="pill">L</span>
+          </div>
+          <p>Prompt with strict JSON schema, retries on malformed output, and fallback to parser A on timeout.</p>
+        </div>
+      </article>
+
+      <article class="column doing">
+        <h2>In Progress</h2>
+
+        <div class="ticket">
+          <h3>EVT-006 - A/B router with sticky assignment option</h3>
+          <div class="meta">
+            <span class="pill">Experiment</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Support random and sender-sticky split. Log assignment, latency, parse validity, and selected parser.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-007 - Event schema + persistence layer</h3>
+          <div class="meta">
+            <span class="pill">API</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Define canonical event model and CRUD API for upcoming events with source traceability fields.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-008 - DM confirmation flow for low-confidence parses</h3>
+          <div class="meta">
+            <span class="pill">Bot</span>
+            <span class="pill">S</span>
+          </div>
+          <p>Send correction prompts to user when confidence threshold is below target before publishing.</p>
+        </div>
+      </article>
+
+      <article class="column blocked">
+        <h2>Blocked</h2>
+
+        <div class="ticket">
+          <h3>EVT-009 - Post event summary to WhatsApp Group</h3>
+          <div class="meta">
+            <span class="pill">Bot</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Blocked until group JID and message template decisions are finalized for production usage.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-010 - LLM provider secret management in Compose</h3>
+          <div class="meta">
+            <span class="pill">Security</span>
+            <span class="pill">S</span>
+          </div>
+          <p>Blocked until final provider and key rotation strategy are chosen (env file vs Docker secret).</p>
+        </div>
+      </article>
+
+      <article class="column done">
+        <h2>Done</h2>
+
+        <div class="ticket">
+          <h3>EVT-011 - Display UI skeleton with auto-advance carousel</h3>
+          <div class="meta">
+            <span class="pill">Display</span>
+            <span class="pill">M</span>
+          </div>
+          <p>Built responsive layout with event slide card format and auto-rotation configuration per device.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-012 - ARM-readiness checklist for Raspberry Pi</h3>
+          <div class="meta">
+            <span class="pill">Ops</span>
+            <span class="pill">S</span>
+          </div>
+          <p>Documented image architecture, memory limits, restart policy, and kiosk browser startup steps.</p>
+        </div>
+
+        <div class="ticket">
+          <h3>EVT-013 - Define metrics for parser experiment</h3>
+          <div class="meta">
+            <span class="pill">Experiment</span>
+            <span class="pill">S</span>
+          </div>
+          <p>Agreed metrics: valid parse rate, correction rate, latency p95, and cost per successful event.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

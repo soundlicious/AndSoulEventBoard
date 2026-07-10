@@ -1,0 +1,13 @@
+{
+  "name": "@coliving/api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@coliving/shared": "0.1.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "coliving-event-display",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "start": "npm run start --workspaces"
+  }
+}
