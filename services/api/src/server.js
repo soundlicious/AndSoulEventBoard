@@ -24,6 +24,10 @@ import {
   markCancelledInGoogleCalendar,
   syncCreateToGoogleCalendar
 } from "./google-calendar.js";
+import {
+  calendarQrTargetLink,
+  createCalendarQrImage
+} from "./calendar-qr.js";
 
 const apiPort = Number(process.env.API_PORT || 8080);
 const autoPublishThreshold = Number(process.env.CONFIDENCE_AUTO_PUBLISH || 0.85);
@@ -307,6 +311,36 @@ function cleanupOrphanMediaFiles() {
   return removed;
 }
 
+async function attachGoogleCalendarData(event) {
+  const sync = await syncCreateToGoogleCalendar(event);
+  if (!sync.ok) {
+    return event;
+  }
+
+  const qrTargetUrl = calendarQrTargetLink(sync);
+  let qrImagePath = null;
+  if (qrTargetUrl) {
+    try {
+      qrImagePath = await createCalendarQrImage({
+        eventId: event.id,
+        targetUrl: qrTargetUrl,
+        mediaDir
+      });
+    } catch {
+      qrImagePath = null;
+    }
+  }
+
+  const patched = updateEvent(event.id, {
+    googleCalendarEventId: sync.googleEventId,
+    googleCalendarHtmlLink: sync.googleHtmlLink,
+    googleCalendarPublicAddLink: sync.googlePublicAddLink,
+    googleCalendarQrImage: qrImagePath || null
+  });
+
+  return patched || event;
+}
+
 function simpleParser(rawText) {
   const titleMatch = rawText.match(/title\s*:\s*([^\n]+)/i);
   const descriptionMatch = rawText.match(/description\s*:\s*([^\n]+)/i);
@@ -506,21 +540,9 @@ export function createServer() {
           return;
         }
         const event = createEvent(normalized);
-        const sync = await syncCreateToGoogleCalendar(event);
-        if (sync.ok) {
-          const patched = updateEvent(event.id, {
-            googleCalendarEventId: sync.googleEventId,
-            googleCalendarHtmlLink: sync.googleHtmlLink,
-            googleCalendarPublicAddLink: sync.googlePublicAddLink
-          });
-          if (patched) {
-            event.googleCalendarEventId = patched.googleCalendarEventId;
-            event.googleCalendarHtmlLink = patched.googleCalendarHtmlLink;
-            event.googleCalendarPublicAddLink = patched.googleCalendarPublicAddLink;
-          }
-        }
+        const withCalendar = await attachGoogleCalendarData(event);
         cleanupOrphanMediaFiles();
-        json(res, 201, event, reqId);
+        json(res, 201, withCalendar, reqId);
       } catch (error) {
         handleRouteError(res, reqId, error);
       }
@@ -684,17 +706,7 @@ export function createServer() {
             },
             status: needsConfirmation ? "draft" : "confirmed"
           });
-          const sync = await syncCreateToGoogleCalendar(event);
-          if (sync.ok) {
-            const patched = updateEvent(event.id, {
-              googleCalendarEventId: sync.googleEventId,
-              googleCalendarHtmlLink: sync.googleHtmlLink,
-              googleCalendarPublicAddLink: sync.googlePublicAddLink
-            });
-            if (patched) {
-              event = patched;
-            }
-          }
+          event = await attachGoogleCalendarData(event);
           cleanupOrphanMediaFiles();
         }
 

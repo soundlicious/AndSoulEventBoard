@@ -262,6 +262,52 @@ test("DELETE /events/:id deletes single event", async (t) => {
   assert.equal(getRes.status, 404);
 });
 
+test("DELETE /events/:id also removes orphaned calendar QR image", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const when = futureDateTime(120);
+
+  const createRes = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Delete with QR",
+      description: "Single delete",
+      date: when.date,
+      time: when.time,
+      image: {
+        mimeType: "image/jpeg",
+        dataBase64: "ZmFrZS1pbWFnZQ=="
+      }
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 201);
+
+  const qrName = `qr-${created.id}.png`;
+  const qrPath = path.join(process.env.MEDIA_DIR, qrName);
+  fs.writeFileSync(qrPath, Buffer.from("fake-qr"));
+
+  const dbPath = process.env.EVENTS_FILE_PATH;
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  const idx = db.events.findIndex((item) => item.id === created.id);
+  db.events[idx].googleCalendarQrImage = `/media/${qrName}`;
+  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf8");
+
+  const qrBefore = await request(baseUrl, `/media/${qrName}`, { method: "GET" });
+  assert.equal(qrBefore.status, 200);
+
+  const delRes = await request(baseUrl, `/events/${created.id}`, {
+    method: "DELETE"
+  });
+  assert.equal(delRes.status, 200);
+
+  const qrAfter = await request(baseUrl, `/media/${qrName}`, { method: "GET" });
+  assert.equal(qrAfter.status, 404);
+});
+
 test("POST /events/batch-delete deletes multiple events", async (t) => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));

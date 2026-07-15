@@ -214,9 +214,16 @@ export function metrics() {
   };
 }
 
+export function replaceEvents(events) {
+  const db = withPrunedDb();
+  db.events = Array.isArray(events) ? events : [];
+  writeDb(db);
+  return db.events.length;
+}
+
 export function listEventMediaPaths() {
   const db = withPrunedDb();
   return db.events
-    .map((event) => event.image)
-    .filter((image) => typeof image === "string" && image.startsWith("/media/"));
+    .flatMap((event) => [event.image, event.googleCalendarQrImage])
+    .filter((mediaPath) => typeof mediaPath === "string" && mediaPath.startsWith("/media/"));
 }
