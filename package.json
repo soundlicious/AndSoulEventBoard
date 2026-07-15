@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "test": "npm run test --workspaces",
-    "start": "npm run start --workspaces"
+    "start": "npm run start --workspaces",
+    "staging:up": "docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up --build",
+    "staging:down": "docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging down"
   }
 }

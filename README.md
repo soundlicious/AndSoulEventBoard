@@ -52,6 +52,13 @@ Staging mode (seeded events + no WhatsApp dependency):
 docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up --build
 ```
 
+Helper scripts:
+
+```bash
+npm run staging:up
+npm run staging:down
+```
+
 5. Open:
 
 - API health: `http://localhost:8080/health`
