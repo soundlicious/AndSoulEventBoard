@@ -133,6 +133,26 @@ Notes:
 
 When an event is created, bot acknowledgment includes both `Event ID` and `Title` so the creator can later cancel it.
 
+## Google Calendar Sync
+
+Events can be mirrored to Google Calendar from API when enabled.
+
+Required `.env` keys:
+
+- `GOOGLE_CALENDAR_ENABLED=true`
+- `GOOGLE_CALENDAR_ID=<calendar-id>`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL=<service-account-email>`
+- `GOOGLE_PRIVATE_KEY=<private-key-with-escaped-newlines>`
+- `GOOGLE_CALENDAR_TIMEZONE=Europe/Madrid`
+- `GOOGLE_CALENDAR_SHARE_BASE_URL=https://calendar.google.com/calendar/r/eventedit`
+
+Behavior:
+
+- On event create: API inserts event in Google Calendar.
+- On event cancel/delete: event is not removed; its Google Calendar title is patched to start with `[CANCELLED]`.
+- Bot creation confirmation includes Calendar link.
+- Group announcement includes Calendar link so users can open and mark participation in Google Calendar.
+
 ## Carousel Display Notes
 
 - Carousel is optimized for kiosk/TV readability with large type and image panel.

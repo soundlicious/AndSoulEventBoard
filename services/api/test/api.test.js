@@ -16,6 +16,7 @@ process.env.INTERNAL_API_TOKEN = "test-internal-token";
 process.env.RATE_LIMIT_WINDOW_MS = "300000";
 process.env.RATE_LIMIT_MAX_PER_SENDER = "3";
 process.env.RATE_LIMIT_MAX_GLOBAL = "50";
+process.env.GOOGLE_CALENDAR_ENABLED = "false";
 
 const { createServer } = await import("../src/server.js");
 

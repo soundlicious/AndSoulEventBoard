@@ -31,6 +31,7 @@ export function buildAckMessage(result) {
   return [
     "Event created and published.",
     `Event ID: ${result.event?.id || "unknown"}`,
-    `Title: ${result.event?.title || "unknown"}`
+    `Title: ${result.event?.title || "unknown"}`,
+    `Calendar: ${result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "not configured"}`
   ].join("\n");
 }

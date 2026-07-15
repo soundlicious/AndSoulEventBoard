@@ -17,8 +17,13 @@ import {
   listEventMediaPaths,
   listEvents,
   markPublished,
-  metrics
+  metrics,
+  updateEvent
 } from "./store.js";
+import {
+  markCancelledInGoogleCalendar,
+  syncCreateToGoogleCalendar
+} from "./google-calendar.js";
 
 const apiPort = Number(process.env.API_PORT || 8080);
 const autoPublishThreshold = Number(process.env.CONFIDENCE_AUTO_PUBLISH || 0.85);
@@ -501,6 +506,19 @@ export function createServer() {
           return;
         }
         const event = createEvent(normalized);
+        const sync = await syncCreateToGoogleCalendar(event);
+        if (sync.ok) {
+          const patched = updateEvent(event.id, {
+            googleCalendarEventId: sync.googleEventId,
+            googleCalendarHtmlLink: sync.googleHtmlLink,
+            googleCalendarPublicAddLink: sync.googlePublicAddLink
+          });
+          if (patched) {
+            event.googleCalendarEventId = patched.googleCalendarEventId;
+            event.googleCalendarHtmlLink = patched.googleCalendarHtmlLink;
+            event.googleCalendarPublicAddLink = patched.googleCalendarPublicAddLink;
+          }
+        }
         cleanupOrphanMediaFiles();
         json(res, 201, event, reqId);
       } catch (error) {
@@ -531,13 +549,22 @@ export function createServer() {
 
     if (req.method === "DELETE" && url.pathname.startsWith("/events/")) {
       const id = url.pathname.split("/")[2];
+      const target = getEvent(id);
+      if (!target) {
+        json(res, 404, { error: "Event not found" }, reqId);
+        return;
+      }
+      const calendarResult = await markCancelledInGoogleCalendar(
+        target.googleCalendarEventId,
+        target.title
+      );
       const result = deleteEvent(id);
       cleanupOrphanMediaFiles();
       if (!result.deleted) {
         json(res, 404, { error: "Event not found" }, reqId);
         return;
       }
-      json(res, 200, { deleted: true, id }, reqId);
+      json(res, 200, { deleted: true, id, calendarResult }, reqId);
       return;
     }
 
@@ -548,6 +575,12 @@ export function createServer() {
         if (ids.length === 0) {
           json(res, 400, { error: "ids must be a non-empty string array" }, reqId);
           return;
+        }
+        for (const id of ids) {
+          const target = getEvent(id);
+          if (target) {
+            await markCancelledInGoogleCalendar(target.googleCalendarEventId, target.title);
+          }
         }
         const result = deleteEventsByIds(ids);
         cleanupOrphanMediaFiles();
@@ -588,6 +621,9 @@ export function createServer() {
             return;
           }
           const result = deleteEvent(cancel.eventId);
+          if (result.deleted) {
+            await markCancelledInGoogleCalendar(target.googleCalendarEventId, target.title);
+          }
           cleanupOrphanMediaFiles();
           json(res, 200, {
             action: "cancel",
@@ -648,6 +684,17 @@ export function createServer() {
             },
             status: needsConfirmation ? "draft" : "confirmed"
           });
+          const sync = await syncCreateToGoogleCalendar(event);
+          if (sync.ok) {
+            const patched = updateEvent(event.id, {
+              googleCalendarEventId: sync.googleEventId,
+              googleCalendarHtmlLink: sync.googleHtmlLink,
+              googleCalendarPublicAddLink: sync.googlePublicAddLink
+            });
+            if (patched) {
+              event = patched;
+            }
+          }
           cleanupOrphanMediaFiles();
         }
 

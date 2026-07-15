@@ -145,6 +145,11 @@ function renderEventMessage(event, organiserMentions) {
       `Date: ${event.date}`,
       `Time: ${event.time}`,
       `Organisers: ${organisers}`,
+      event.googleCalendarPublicAddLink
+        ? `Calendar: ${event.googleCalendarPublicAddLink}`
+        : event.googleCalendarHtmlLink
+          ? `Calendar: ${event.googleCalendarHtmlLink}`
+          : "",
       event.image ? `Image: ${event.image}` : ""
     ].filter(Boolean).join("\n"),
     mentionJids

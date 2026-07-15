@@ -154,6 +154,23 @@ export function deleteEventsByIds(ids) {
   return { deletedCount };
 }
 
+export function updateEvent(id, patch) {
+  const db = withPrunedDb();
+  const idx = db.events.findIndex((item) => item.id === id);
+  if (idx === -1) {
+    return null;
+  }
+
+  const updated = {
+    ...db.events[idx],
+    ...patch,
+    updatedAt: new Date().toISOString()
+  };
+  db.events[idx] = updated;
+  writeDb(db);
+  return updated;
+}
+
 export function insertParseLog(payload) {
   const db = readDb();
   const parseLog = {

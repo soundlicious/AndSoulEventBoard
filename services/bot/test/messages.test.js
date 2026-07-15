@@ -6,11 +6,16 @@ test("buildAckMessage returns success text", () => {
   const text = buildAckMessage({
     valid: true,
     needsConfirmation: false,
-    event: { id: "evt_123" }
+    event: {
+      id: "evt_123",
+      title: "Dinner",
+      googleCalendarPublicAddLink: "https://calendar.google.com/calendar/r/eventedit/abc"
+    }
   });
   assert.equal(text.includes("Event created and published"), true);
   assert.equal(text.includes("evt_123"), true);
   assert.equal(text.includes("Title:"), true);
+  assert.equal(text.includes("Calendar:"), true);
 });
 
 test("buildAckMessage includes missing field details", () => {
