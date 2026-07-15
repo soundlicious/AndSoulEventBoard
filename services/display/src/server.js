@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildDisplayHtml } from "./display-page.js";
 
 const displayPort = Number(process.env.DISPLAY_PORT || 3000);
 const apiUrl = process.env.PUBLIC_API_URL || "http://localhost:8080";
@@ -16,6 +17,9 @@ const proxyMaxMediaBytes = Number(process.env.DISPLAY_PROXY_MAX_MEDIA_BYTES || 5
 const hereDir = path.dirname(fileURLToPath(import.meta.url));
 const adminJs = fs.readFileSync(path.join(hereDir, "admin.js"), "utf8");
 const createEventJs = fs.readFileSync(path.join(hereDir, "create-event.js"), "utf8");
+const displayJs = fs.readFileSync(path.join(hereDir, "display.js"), "utf8");
+const displayModelJs = fs.readFileSync(path.join(hereDir, "display-model.js"), "utf8");
+const displayCss = fs.readFileSync(path.join(hereDir, "display.css"), "utf8");
 
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
@@ -28,355 +32,13 @@ function readRequestBody(req) {
   });
 }
 
-const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Event Carousel</title>
-  <style>
-    :root {
-      --bg: #08111d;
-      --panel: #0f1d31;
-      --ink: #e8f0ff;
-      --muted: #a6b8d8;
-      --accent: #22d3ee;
-      --good: #34d399;
-      --bad: #fda4af;
-    }
-    body {
-      margin: 0;
-      font-family: "Sora", "Segoe UI", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(34, 211, 238, 0.18), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.18), transparent 32%),
-        var(--bg);
-      overflow: hidden;
-      user-select: none;
-      cursor: none;
-    }
-    .wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
-    .card {
-      width: min(1180px, 96vw);
-      min-height: min(86vh, 860px);
-      background: linear-gradient(160deg, #0b1629, #12243d);
-      border: 1px solid #2e4667;
-      border-radius: 24px;
-      padding: 34px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 24px;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity 450ms ease, transform 450ms ease;
-    }
-    .card.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .left {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 18px;
-    }
-    .badgeRow {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .pill {
-      display: inline-block;
-      border-radius: 999px;
-      border: 1px solid #355782;
-      padding: 4px 12px;
-      font-size: 0.85rem;
-      color: #d6e9ff;
-      background: rgba(17, 34, 56, 0.6);
-    }
-    h1 { margin: 0; font-size: clamp(2rem, 4.2vw, 3.6rem); line-height: 1.1; }
-    .time { color: var(--accent); font-size: clamp(1.35rem, 2.6vw, 2rem); margin-top: 10px; }
-    .desc {
-      color: #d3def5;
-      font-size: clamp(1.05rem, 1.8vw, 1.5rem);
-      line-height: 1.35;
-      margin-top: 14px;
-      max-width: 50ch;
-    }
-    .meta { color: var(--muted); font-size: clamp(1rem, 1.4vw, 1.2rem); }
-    .statusGood { color: var(--good); }
-    .statusBad { color: var(--bad); }
-    .right {
-      display: grid;
-      place-items: center;
-      border: 1px solid #2a425f;
-      border-radius: 16px;
-      background: rgba(10, 20, 35, 0.55);
-      overflow: hidden;
-      min-height: 320px;
-    }
-    .image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .noImage {
-      color: #7f97be;
-      font-size: 1.1rem;
-      padding: 20px;
-      text-align: center;
-    }
-    .topBar {
-      position: fixed;
-      left: 12px;
-      right: 12px;
-      top: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85rem;
-      color: #a8bfdf;
-      pointer-events: none;
-    }
-    .offline {
-      border-radius: 999px;
-      border: 1px solid #7f1d1d;
-      background: rgba(127, 29, 29, 0.28);
-      color: #fecaca;
-      padding: 4px 10px;
-      display: none;
-    }
-    .offline.show { display: inline-block; }
-    .debugPanel {
-      position: fixed;
-      bottom: 12px;
-      right: 12px;
-      width: min(520px, calc(100vw - 24px));
-      max-height: 42vh;
-      overflow: auto;
-      border-radius: 12px;
-      border: 1px solid #355782;
-      background: rgba(8, 17, 29, 0.86);
-      color: #d6e9ff;
-      padding: 10px 12px;
-      font-size: 0.82rem;
-      line-height: 1.35;
-      display: none;
-      cursor: auto;
-      user-select: text;
-    }
-    .debugPanel.show { display: block; }
-    .debugTitle { font-weight: 700; margin-bottom: 6px; color: #a5d8ff; }
-    .debugLine { margin-bottom: 4px; }
-    .empty { color: var(--muted); font-size: 1.2rem; }
-    .badge {
-      margin-top: 12px;
-      display: inline-block;
-      border-radius: 999px;
-      border: 1px solid #2c4358;
-      padding: 4px 10px;
-      color: #b8d7ff;
-      font-size: 0.8rem;
-    }
-    @media (max-width: 960px) {
-      .card {
-        grid-template-columns: 1fr;
-        min-height: auto;
-        padding: 24px;
-      }
-      .right {
-        min-height: 220px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="topBar">
-    <div id="clock">--:--</div>
-    <div id="offline" class="offline">Offline: waiting for API</div>
-  </div>
-  <main class="wrap">
-    <section class="card show" id="card">
-      <p class="empty">Loading events...</p>
-    </section>
-  </main>
-  <aside id="debugPanel" class="debugPanel"></aside>
-
-  <script>
-    const API_URL = ${JSON.stringify(apiUrl)};
-    const MEDIA_BASE_URL = ${JSON.stringify(mediaBaseUrl)};
-    const INTERVAL = ${Number.isFinite(interval) ? interval : 8000};
-    const MAX_DAYS = ${Number.isFinite(maxDaysAhead) ? maxDaysAhead : 30};
-    const ENABLE_DEBUG = ${displayEnableDebug ? "true" : "false"};
-    let events = [];
-    let idx = 0;
-    let connected = true;
-    let lastRefreshAt = null;
-    let lastError = null;
-    let debugVisible = false;
-
-    function fmtDate(date, time) {
-      if (!date) {
-        return "Unknown date";
-      }
-      return time ? (date + " " + time) : date;
-    }
-
-    function dayLabel(dateValue) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const target = new Date(dateValue + 'T00:00:00');
-      const ms = target.getTime() - today.getTime();
-      const days = Math.round(ms / (24 * 60 * 60 * 1000));
-      if (days === 0) return 'Today';
-      if (days === 1) return 'Tomorrow';
-      if (days > 1) return 'In ' + days + ' days';
-      return 'Past due';
-    }
-
-    function shouldKeep(event) {
-      if (!event.date) {
-        return true;
-      }
-      const now = new Date();
-      const limit = new Date(now.getTime() + MAX_DAYS * 24 * 60 * 60 * 1000);
-      const target = new Date(event.date + 'T' + (event.time || '23:59') + ':00');
-      return target.getTime() <= limit.getTime();
-    }
-
-    function slideDurationMs(item) {
-      if (item.image) {
-        return Math.max(INTERVAL, 10000);
-      }
-      if ((item.description || '').length > 160) {
-        return Math.max(INTERVAL, 9000);
-      }
-      return INTERVAL;
-    }
-
-    function updateConnection(isOk) {
-      connected = isOk;
-      const offline = document.getElementById('offline');
-      if (!offline) return;
-      offline.classList.toggle('show', !isOk);
-      updateDebugPanel();
-    }
-
-    function tickClock() {
-      const clock = document.getElementById('clock');
-      if (!clock) return;
-      clock.textContent = new Date().toLocaleString();
-    }
-
-    function updateDebugPanel() {
-      const panel = document.getElementById('debugPanel');
-      if (!panel || !ENABLE_DEBUG) {
-        return;
-      }
-      const current = events.length ? events[(idx - 1 + events.length) % events.length] : null;
-      panel.innerHTML = [
-        '<div class="debugTitle">Display Debug (press D to toggle)</div>',
-        '<div class="debugLine">connected: ' + connected + '</div>',
-        '<div class="debugLine">events: ' + events.length + '</div>',
-        '<div class="debugLine">slideIndex: ' + idx + '</div>',
-        '<div class="debugLine">currentTitle: ' + (current?.title || '-') + '</div>',
-        '<div class="debugLine">lastRefreshAt: ' + (lastRefreshAt || '-') + '</div>',
-        '<div class="debugLine">lastError: ' + (lastError || '-') + '</div>',
-        '<div class="debugLine">apiUrl: ' + API_URL + '</div>',
-        '<div class="debugLine">mediaBaseUrl: ' + MEDIA_BASE_URL + '</div>',
-        '<div class="debugLine">intervalMs: ' + INTERVAL + '</div>',
-        '<div class="debugLine">maxDaysAhead: ' + MAX_DAYS + '</div>'
-      ].join('');
-      panel.classList.toggle('show', debugVisible);
-    }
-
-    function render() {
-      const card = document.getElementById("card");
-      card.classList.remove('show');
-      if (!events.length) {
-        card.innerHTML = '<p class="empty">No upcoming events yet</p><span class="badge">Waiting for DM submissions</span>';
-        requestAnimationFrame(() => card.classList.add('show'));
-        return;
-      }
-      const item = events[idx % events.length];
-      idx += 1;
-      const organisers = Array.isArray(item.organisers) && item.organisers.length
-        ? item.organisers.map((name) => '@' + name).join(' ')
-        : 'TBD';
-      const label = dayLabel(item.date);
-      const statusClass = label === 'Past due' ? 'statusBad' : 'statusGood';
-      const imageUrl = item.image
-        ? (item.image.startsWith('/media/') ? (MEDIA_BASE_URL + item.image) : item.image)
-        : null;
-      const imageHtml = imageUrl
-        ? '<img class="image" src="' + imageUrl + '" alt="event" />'
-        : '<div class="noImage">No image attached</div>';
-      card.innerHTML = [
-        '<div class="left">',
-        '  <div>',
-        '    <div class="badgeRow">',
-        '      <span class="pill">Upcoming Event</span>',
-        '      <span class="pill ' + statusClass + '">' + label + '</span>',
-        '    </div>',
-        '    <h1>' + (item.title || 'Untitled Event') + '</h1>',
-        '    <div class="time">' + fmtDate(item.date, item.time) + '</div>',
-        '    <div class="desc">' + (item.description || 'No description') + '</div>',
-        '  </div>',
-        '  <div>',
-        '    <div class="meta">Organisers: ' + organisers + '</div>',
-        '    <span class="badge">Status: ' + (item.status || 'unknown') + '</span>',
-        '  </div>',
-        '</div>',
-        '<div class="right">' + imageHtml + '</div>'
-      ].join('');
-      requestAnimationFrame(() => card.classList.add('show'));
-      updateDebugPanel();
-    }
-
-    async function refresh() {
-      try {
-        const response = await fetch(API_URL + '/events');
-        const data = await response.json();
-        events = Array.isArray(data.items) ? data.items.filter(shouldKeep) : [];
-        lastRefreshAt = new Date().toISOString();
-        lastError = null;
-        updateConnection(true);
-      } catch {
-        lastError = 'Failed to fetch events';
-        updateConnection(false);
-      }
-      render();
-    }
-
-    function loopSlides() {
-      render();
-      if (!events.length) {
-        setTimeout(loopSlides, INTERVAL);
-        return;
-      }
-      const item = events[(idx - 1 + events.length) % events.length];
-      setTimeout(loopSlides, slideDurationMs(item));
-    }
-
-    tickClock();
-    setInterval(tickClock, 1000);
-    if (ENABLE_DEBUG) {
-      window.addEventListener('keydown', (event) => {
-        if (event.key.toLowerCase() === 'd') {
-          debugVisible = !debugVisible;
-          updateDebugPanel();
-        }
-      });
-    }
-    refresh();
-    setInterval(refresh, INTERVAL);
-    setTimeout(loopSlides, Math.max(3000, Math.floor(INTERVAL / 2)));
-  </script>
-</body>
-</html>`;
+const html = buildDisplayHtml({
+  apiUrl,
+  mediaBaseUrl,
+  interval,
+  maxDaysAhead,
+  enableDebug: displayEnableDebug
+});
 
 const adminHtml = `<!doctype html>
 <html lang="en">
@@ -616,6 +278,24 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/admin.js") {
     res.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
     res.end(adminJs);
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/display.js") {
+    res.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
+    res.end(displayJs);
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/display-model.js") {
+    res.writeHead(200, { "content-type": "application/javascript; charset=utf-8" });
+    res.end(displayModelJs);
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/display.css") {
+    res.writeHead(200, { "content-type": "text/css; charset=utf-8" });
+    res.end(displayCss);
     return;
   }
 
