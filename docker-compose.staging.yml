@@ -1,0 +1,25 @@
+services:
+  api:
+    env_file:
+      - .env.staging
+    environment:
+      - NODE_ENV=production
+      - GOOGLE_CALENDAR_ENABLED=false
+      - LLM_API_KEY=
+      - ENABLE_BAILEYS=false
+      - STAGING_SEED_EVENTS_ENABLED=true
+      - STAGING_SEED_RESET_ON_START=true
+      - STAGING_SEED_EVENTS_COUNT=${STAGING_SEED_EVENTS_COUNT:-20}
+
+  bot:
+    profiles:
+      - disabled
+
+  display:
+    env_file:
+      - .env.staging
+    environment:
+      - DISPLAY_ENABLE_DEBUG=true
+
+volumes:
+  events_data:

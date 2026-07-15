@@ -46,6 +46,12 @@ npm test
 docker compose up --build
 ```
 
+Staging mode (seeded events + no WhatsApp dependency):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up --build
+```
+
 5. Open:
 
 - API health: `http://localhost:8080/health`
@@ -57,6 +63,22 @@ docker compose up --build
 - `api` provides event ingestion, event listing, publish endpoint, and parser experiment metrics.
 - `bot` is currently a Baileys-ready scaffold that simulates inbound DM payloads.
 - `display` is a kiosk-friendly carousel page that polls the API.
+
+## Staging Environment
+
+- Use `.env.staging` with `docker-compose.staging.yml` overlay.
+- Bot service is disabled in staging, so you can create events manually without WhatsApp connected.
+- API seeds fresh sample events on every staging startup.
+- All seeded events are always future-dated relative to current date.
+- You can still add/edit/delete events through:
+  - `http://localhost:3000/create-event`
+  - `http://localhost:3000/admin`
+
+Staging seed controls:
+
+- `STAGING_SEED_EVENTS_ENABLED` (default `false`)
+- `STAGING_SEED_RESET_ON_START` (default `true`)
+- `STAGING_SEED_EVENTS_COUNT` (default `16`)
 
 ## Group Targets Configuration
 
@@ -149,7 +171,9 @@ Required `.env` keys:
 Behavior:
 
 - On event create: API inserts event in Google Calendar.
+- On successful Google event creation: API generates a QR image (pointing to the calendar add/open link) and stores it as `googleCalendarQrImage`.
 - On event cancel/delete: event is not removed; its Google Calendar title is patched to start with `[CANCELLED]`.
+- On event delete/cancel: QR image is cleaned up with other orphan media.
 - Bot creation confirmation includes Calendar link.
 - Group announcement includes Calendar link so users can open and mark participation in Google Calendar.
 
@@ -164,6 +188,7 @@ Behavior:
   - `PUBLIC_MEDIA_URL` controls media host when display/API are on different hosts.
   - `DISPLAY_API_SERVER_URL` is display container -> API internal URL (default `http://api:8080`).
   - `DISPLAY_PROXY_MAX_MEDIA_BYTES` and `DISPLAY_PROXY_MAX_BODY_BYTES` cap form upload payloads before proxying (defaults now set for 20MB media).
+- If present, `googleCalendarQrImage` is rendered overlapping the event image bottom-right corner (half in / half out) for kiosk scanning.
 - Debug tools:
   - Press `d` on display page to toggle a local debug overlay.
   - `GET /debug` on display service returns runtime/config diagnostics.

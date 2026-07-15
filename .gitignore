@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.staging
 services/*/node_modules/
 packages/*/node_modules/
 services/api/data/
