@@ -28,5 +28,9 @@ export function buildAckMessage(result) {
   if (result.needsConfirmation) {
     return "Event parsed but needs confirmation before publishing. I saved it as draft.";
   }
-  return `Event created and published. Event ID: ${result.event?.id || "unknown"}`;
+  return [
+    "Event created and published.",
+    `Event ID: ${result.event?.id || "unknown"}`,
+    `Title: ${result.event?.title || "unknown"}`
+  ].join("\n");
 }

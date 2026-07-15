@@ -113,6 +113,10 @@ Preferred command syntax:
 
 `/event title="..." date="YYYY-MM-DD" time="HH:mm" desc="..." organisers="@pablo @maria"`
 
+Event cancellation syntax (creator only):
+
+`/cancel-event evt_xxxxx`
+
 Image is not a URL in your flow: send the image attached in the same DM message (with optional caption using `/event ...`).
 
 Notes:
@@ -126,6 +130,8 @@ Notes:
 - Oversized media/request payloads are rejected (`MAX_MEDIA_BYTES`, `API_MAX_BODY_BYTES`).
 - Internal write routes require `x-internal-token` when `INTERNAL_API_TOKEN` is configured.
 - `/ingest/dm` is rate-limited (configurable via `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_PER_SENDER`, `RATE_LIMIT_MAX_GLOBAL`).
+
+When an event is created, bot acknowledgment includes both `Event ID` and `Title` so the creator can later cancel it.
 
 ## Carousel Display Notes
 

@@ -414,6 +414,13 @@ async function startBaileysRuntime() {
           continue;
         }
 
+        if (json.action === "cancel") {
+          await sock.sendMessage(remoteJid, {
+            text: json.message || "Cancel request processed"
+          });
+          continue;
+        }
+
         await sock.sendMessage(remoteJid, {
           text: buildAckMessage(json)
         });

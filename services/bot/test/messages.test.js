@@ -10,6 +10,7 @@ test("buildAckMessage returns success text", () => {
   });
   assert.equal(text.includes("Event created and published"), true);
   assert.equal(text.includes("evt_123"), true);
+  assert.equal(text.includes("Title:"), true);
 });
 
 test("buildAckMessage includes missing field details", () => {

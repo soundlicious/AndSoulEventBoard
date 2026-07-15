@@ -96,6 +96,14 @@ function parseNewCommand(rawText) {
   };
 }
 
+function parseCancelCommand(rawText) {
+  const match = rawText.trim().match(/^\/cancel-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  if (!match) {
+    return null;
+  }
+  return { eventId: match[1] };
+}
+
 function json(res, statusCode, payload, reqId) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
@@ -413,6 +421,9 @@ function assignmentForSender(senderJid, mode) {
 }
 
 export function createServer() {
+  perSenderRate.clear();
+  globalRate.length = 0;
+
   return http.createServer(async (req, res) => {
     const reqId = randomUUID();
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -557,6 +568,36 @@ export function createServer() {
           return;
         }
         const rawText = body.rawText || "";
+        const cancel = parseCancelCommand(rawText);
+        if (cancel) {
+          const target = getEvent(cancel.eventId);
+          if (!target) {
+            json(res, 200, {
+              action: "cancel",
+              ok: false,
+              message: "Event not found"
+            }, reqId);
+            return;
+          }
+          if (target.createdBy !== senderJid) {
+            json(res, 200, {
+              action: "cancel",
+              ok: false,
+              message: "Only the creator can cancel this event"
+            }, reqId);
+            return;
+          }
+          const result = deleteEvent(cancel.eventId);
+          cleanupOrphanMediaFiles();
+          json(res, 200, {
+            action: "cancel",
+            ok: result.deleted,
+            message: result.deleted ? `Event ${cancel.eventId} deleted` : "Delete failed",
+            eventId: cancel.eventId
+          }, reqId);
+          return;
+        }
+
         const assignmentMode = process.env.AB_ASSIGNMENT_MODE || "sender_sticky";
         const variant = assignmentForSender(senderJid, assignmentMode);
 

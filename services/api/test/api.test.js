@@ -150,6 +150,54 @@ test("POST /ingest/dm creates event and parse log", async (t) => {
   assert.equal(mediaRes.status, 200);
 });
 
+test("POST /ingest/dm supports cancel-event by creator only", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const when = futureDateTime(120);
+
+  const createIngest = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-create-cancel",
+      rawText: `/event title=\"Cancelable\" date=\"${when.date}\" time=\"${when.time}\" desc=\"temp\"`
+    })
+  });
+  const created = await createIngest.json();
+  assert.equal(createIngest.status, 200);
+  assert.equal(Boolean(created.event?.id), true);
+
+  const unauthorizedCancel = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600999999@s.whatsapp.net",
+      messageId: "MSG-cancel-nope",
+      rawText: `/cancel-event ${created.event.id}`
+    })
+  });
+  const unauthorizedJson = await unauthorizedCancel.json();
+  assert.equal(unauthorizedCancel.status, 200);
+  assert.equal(unauthorizedJson.ok, false);
+
+  const authorizedCancel = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-cancel-yes",
+      rawText: `/cancel-event ${created.event.id}`
+    })
+  });
+  const authorizedJson = await authorizedCancel.json();
+  assert.equal(authorizedCancel.status, 200);
+  assert.equal(authorizedJson.ok, true);
+
+  const checkDeleted = await request(baseUrl, `/events/${created.event.id}`, { method: "GET" });
+  assert.equal(checkDeleted.status, 404);
+});
+
 test("POST /events/:id/publish appends published group jids", async (t) => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));

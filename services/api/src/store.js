@@ -79,6 +79,10 @@ export function createEvent(payload) {
     ...payload
   };
 
+  if (!event.createdBy) {
+    event.createdBy = event?.source?.senderJid || null;
+  }
+
   const senderJid = event?.source?.senderJid;
   const messageId = event?.source?.messageId;
   if (senderJid && messageId) {
