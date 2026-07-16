@@ -20,14 +20,14 @@ test("buildAckMessage returns success text", () => {
     }
   }, {
     cancelEventLink: "https://wa.me/34600000000?text=%2Fcancel-event%20evt_123",
-    rsvpsListLink: "https://wa.me/34600000000?text=%2FRSVPS-EVENT%20evt_123"
+    rsvpsListLink: "https://wa.me/34600000000?text=%2FRSVPS-EVENT%20evt_123",
+    groupNames: ["Shoreditch &Soul Villa Events"]
   });
-  assert.equal(text.includes("Event created and published"), true);
-  assert.equal(text.includes("evt_123"), true);
-  assert.equal(text.includes("Title:"), true);
-  assert.equal(text.includes("Calendar:"), true);
-  assert.equal(text.includes("Delete Event:"), true);
-  assert.equal(text.includes("View RSVPs:"), true);
+  assert.equal(text.includes("*Your event is live!*"), true);
+  assert.equal(text.includes("Published in *Shoreditch &Soul Villa Events*"), true);
+  assert.equal(text.includes("*If you want to see the event on your calendar:*"), true);
+  assert.equal(text.includes("*If you want to see who joined:*"), true);
+  assert.equal(text.includes("*If you want to delete this event:*"), true);
 });
 
 test("buildAckMessage includes missing field details", () => {
@@ -90,9 +90,11 @@ test("buildNativeEventEnrichmentPrompt explains organisers and image requirement
     endTime: "23:59",
     organisersCommandLink: "https://wa.me/34600000000?text=%2Forganisers%20tempId%3D%22tmp_ab12cd34%22"
   });
-  assert.equal(text.includes("organisers=\"@pablo @maria\""), true);
-  assert.equal(text.includes("attached"), true);
-  assert.equal(text.includes("Quick reply:"), true);
+  assert.equal(text.includes("*To finish creating your event:*"), true);
+  assert.equal(text.includes("1) Edit organiser names"), true);
+  assert.equal(text.includes("*Do not remove tempId or quotes.*"), true);
+  assert.equal(text.includes("*Click here to continue:*"), true);
+  assert.equal(text.includes("https://wa.me/"), true);
 });
 
 test("buildNativeEventEnrichmentReminder explains missing fields", () => {

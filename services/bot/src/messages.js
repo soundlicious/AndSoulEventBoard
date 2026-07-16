@@ -1,4 +1,4 @@
-export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = "" } = {}) {
+export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = "", groupNames = [] } = {}) {
   if (!result) {
     return "I could not process your message. Please try again.";
   }
@@ -28,13 +28,23 @@ export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = 
   if (result.needsConfirmation) {
     return "Event parsed but needs confirmation before publishing. I saved it as draft.";
   }
+  const calendarLink = result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "";
+  const groupsLine = Array.isArray(groupNames) && groupNames.length > 0
+    ? groupNames.join(", ")
+    : "the configured WhatsApp group";
   return [
-    "Event created and published.",
-    `Event ID: ${result.event?.id || "unknown"}`,
-    `Title: ${result.event?.title || "unknown"}`,
-    `Calendar: ${result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "not configured"}`,
-    cancelEventLink ? `Delete Event: ${cancelEventLink}` : "",
-    rsvpsListLink ? `View RSVPs: ${rsvpsListLink}` : ""
+    "*Your event is live!*",
+    `*Event:* ${result.event?.title || "Untitled event"}`,
+    `Published in *${groupsLine}* and on the *Community Live Board*.`,
+    "",
+    "*If you want to see the event on your calendar:*",
+    calendarLink || "Calendar link not available yet.",
+    "",
+    "*If you want to see who joined:*",
+    rsvpsListLink || "RSVP list link not available.",
+    "",
+    "*If you want to delete this event:*",
+    cancelEventLink || "Delete link not available."
   ].join("\n");
 }
 
@@ -94,18 +104,31 @@ export function buildRsvpsListReply(result) {
 export function buildNativeEventEnrichmentPrompt(draft) {
   const tempId = draft.tempId || "tmp_missing";
   const organisersCommandLink = String(draft.organisersCommandLink || "").trim();
+  const commandLine = `/organisers tempId="${tempId}", organisers="@pablo @maria"`;
+  if (organisersCommandLink) {
+    return [
+      "*To finish creating your event:*",
+      "1) Edit organiser names in the prefilled message",
+      "2) Attach one image to that same message",
+      "3) Press Send",
+      "",
+      "*Do not remove tempId or quotes.*",
+      "",
+      `*Click here to continue:* ${organisersCommandLink}`
+    ].join("\n");
+  }
+
   return [
-    "Great, I received your WhatsApp Event draft.",
-    `Temp ID: ${tempId}`,
-    `Title: ${draft.title || "Community Event"}`,
-    `Date: ${draft.date || "unknown"}`,
-    `Start: ${draft.startTime || "unknown"}`,
-    `End: ${draft.endTime || "23:59"}`,
-    "To publish it, reply using this command and attach the event image in the SAME message:",
-    `/organisers tempId="${tempId}", organisers="@pablo @maria"`,
-    organisersCommandLink ? `Quick reply: ${organisersCommandLink}` : "",
-    "The image must be attached (not a URL)."
-  ].filter(Boolean).join("\n");
+    "*To finish creating your event:*",
+    "1) Copy and send this command",
+    "2) Attach one image to that same message",
+    "3) Press Send",
+    "",
+    "*Command:*",
+    commandLine,
+    "",
+    "*Do not remove tempId or quotes.*"
+  ].join("\n");
 }
 
 export function buildNativeEventEnrichmentReminder({

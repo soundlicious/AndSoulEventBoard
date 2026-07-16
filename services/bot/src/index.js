@@ -119,13 +119,21 @@ function shouldObserveDmMessage(msg, remoteJid) {
       || (hasPendingNative && normalizedText.startsWith("/"));
   }
 
+  const isSupportedCommand = normalizedText.startsWith(commandPrefix)
+    || normalizedText.startsWith("/rsvp-event ")
+    || normalizedText.startsWith("/cancel-rsvp-event ")
+    || normalizedText.startsWith("/rsvps-event ")
+    || normalizedText.startsWith("/cancel-event ")
+    || normalizedText.startsWith("/organisers ")
+    || normalizedText.startsWith("/organizers ");
+
   if (msg.key.fromMe && !allowFromMe) {
-    return false;
+    return isSupportedCommand;
   }
   if (hasNativeEvent) {
     return true;
   }
-  return startsWithCommand;
+  return startsWithCommand || (hasPendingNative && normalizedText.startsWith("/"));
 }
 
 function shouldProcessMessageId(messageId) {
@@ -269,6 +277,21 @@ function creatorActionLinks(eventId) {
     cancelEventLink: buildClickToChatLink(`/cancel-event ${eventId}`),
     rsvpsListLink: buildClickToChatLink(`/RSVPS-EVENT ${eventId}`)
   };
+}
+
+function enabledGroupNames() {
+  const { groups } = readGroupConfig();
+  return groups
+    .map((group) => String(group?.name || "").trim())
+    .filter((name) => name.length > 0);
+}
+
+async function sendText(sock, jid, text) {
+  await sock.sendMessage(
+    jid,
+    { text },
+    { linkPreview: false }
+  );
 }
 
 async function fetchEvent(eventId) {
@@ -538,12 +561,10 @@ async function startBaileysRuntime() {
       const imageMarker = extractImagePayload(msg.message);
       const nativeDraft = extractNativeEventDraft(unwrapMessage(msg.message));
 
-      if (!text && !imageMarker && !nativeDraft) {
-        await sock.sendMessage(remoteJid, {
-          text: "I could not read your message. Please send text using /event ... (you can attach an image)."
-        });
-        continue;
-      }
+        if (!text && !imageMarker && !nativeDraft) {
+          await sendText(sock, remoteJid, "I could not read your message. Please send text using /event ... (you can attach an image).");
+          continue;
+        }
 
       try {
         let image = null;
@@ -561,7 +582,7 @@ async function startBaileysRuntime() {
               tempId: session.tempId,
               organisersCommandLink
             })
-          });
+          }, { linkPreview: false });
           continue;
         }
 
@@ -573,13 +594,13 @@ async function startBaileysRuntime() {
           if (pendingNative.expired) {
             await sock.sendMessage(remoteJid, {
               text: buildNativeEventEnrichmentExpired()
-            });
+            }, { linkPreview: false });
             continue;
           }
           if (!pendingNative.complete) {
             await sock.sendMessage(remoteJid, {
               text: buildNativeEventEnrichmentReminder(pendingNative)
-            });
+            }, { linkPreview: false });
             continue;
           }
 
@@ -605,9 +626,7 @@ async function startBaileysRuntime() {
             process.stderr.write(
               `[${botName}] native event create failed status=${createRes.status} details=${details}\n`
             );
-            await sock.sendMessage(remoteJid, {
-              text: `I could not publish the event: ${details}`
-            });
+            await sendText(sock, remoteJid, `I could not publish the event: ${details}`);
             continue;
           }
 
@@ -615,9 +634,14 @@ async function startBaileysRuntime() {
             `[${botName}] native event created id=${createJson.id} title=${createJson.title || "unknown"}\n`
           );
 
-          await sock.sendMessage(remoteJid, {
-            text: buildAckMessage({ valid: true, needsConfirmation: false, event: createJson }, creatorActionLinks(createJson.id || ""))
-          });
+          await sendText(
+            sock,
+            remoteJid,
+            buildAckMessage(
+              { valid: true, needsConfirmation: false, event: createJson },
+              { ...creatorActionLinks(createJson.id || ""), groupNames: enabledGroupNames() }
+            )
+          );
           await publishViaBaileys(sock, createJson.id);
           continue;
         }
@@ -642,16 +666,12 @@ async function startBaileysRuntime() {
         }
 
         if (!res.ok) {
-          await sock.sendMessage(remoteJid, {
-            text: `Request failed: ${json.error || "unknown error"}`
-          });
+          await sendText(sock, remoteJid, `Request failed: ${json.error || "unknown error"}`);
           continue;
         }
 
         if (json.action === "cancel") {
-          await sock.sendMessage(remoteJid, {
-            text: json.message || "Cancel request processed"
-          });
+          await sendText(sock, remoteJid, json.message || "Cancel request processed");
           continue;
         }
 
@@ -659,29 +679,32 @@ async function startBaileysRuntime() {
           const eventId = json.eventId || json.event?.id || "";
           const rsvpLink = eventId ? buildClickToChatLink(`/RSVP-EVENT ${eventId}`) : "";
           const cancelRsvpLink = eventId ? buildClickToChatLink(`/CANCEL-RSVP-EVENT ${eventId}`) : "";
-          await sock.sendMessage(remoteJid, {
-            text: buildRsvpReply(json, { rsvpLink, cancelRsvpLink })
-          });
+          await sendText(sock, remoteJid, buildRsvpReply(json, { rsvpLink, cancelRsvpLink }));
           continue;
         }
 
         if (json.action === "rsvps_list") {
           process.stdout.write(`[${botName}] rsvps_list eventId=${json.eventId || "unknown"} ok=${Boolean(json.ok)} count=${json.count ?? 0}\n`);
-          await sock.sendMessage(remoteJid, {
-            text: buildRsvpsListReply(json)
-          });
+          await sendText(sock, remoteJid, buildRsvpsListReply(json));
           continue;
         }
 
-        await sock.sendMessage(remoteJid, {
-          text: buildAckMessage(json, creatorActionLinks(json.event?.id || ""))
-        });
+        await sendText(
+          sock,
+          remoteJid,
+          buildAckMessage(json, { ...creatorActionLinks(json.event?.id || ""), groupNames: enabledGroupNames() })
+        );
 
         if (json.event?.id && !json.needsConfirmation) {
           await publishViaBaileys(sock, json.event.id);
         }
       } catch (error) {
         process.stderr.write(`[${botName}] dm ingest failed: ${error.message}\n`);
+        try {
+          await sendText(sock, remoteJid, "Temporary error while processing your request. Please retry in a few seconds.");
+        } catch (sendError) {
+          process.stderr.write(`[${botName}] failed sending error reply: ${sendError.message}\n`);
+        }
       }
     }
   });
@@ -692,7 +715,7 @@ async function startBaileysRuntime() {
       try {
         await sock.sendMessage(session.remoteJid, {
           text: buildNativeEventEnrichmentExpired()
-        });
+        }, { linkPreview: false });
       } catch (error) {
         process.stderr.write(`[${botName}] failed sending native-event expiry message: ${error.message}\n`);
       }

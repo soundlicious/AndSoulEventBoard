@@ -4,16 +4,21 @@ const SESSION_TIMEOUT_MS = Number(process.env.BOT_EVENT_ENRICH_TIMEOUT_MS || 10 
 
 const sessions = new Map();
 
+function sessionKey(senderJid) {
+  return String(senderJid || "").trim().toLowerCase().split("@")[0] || "";
+}
+
 export function hasOpenNativeEventSession(senderJid) {
-  if (!senderJid) {
+  const key = sessionKey(senderJid);
+  if (!key) {
     return false;
   }
-  const session = sessions.get(senderJid);
+  const session = sessions.get(key);
   if (!session) {
     return false;
   }
   if (Date.now() > session.expiresAt) {
-    sessions.delete(senderJid);
+    sessions.delete(key);
     return false;
   }
   return true;
@@ -99,6 +104,7 @@ export function extractNativeEventDraft(msg) {
 }
 
 export function openNativeEventSession(senderJid, remoteJid, draft) {
+  const key = sessionKey(senderJid);
   const session = {
     senderJid,
     remoteJid,
@@ -107,18 +113,19 @@ export function openNativeEventSession(senderJid, remoteJid, draft) {
     openedAt: Date.now(),
     expiresAt: Date.now() + SESSION_TIMEOUT_MS
   };
-  sessions.set(senderJid, session);
+  sessions.set(key, session);
   return session;
 }
 
 export function consumeNativeEventIfReady(senderJid, { text, image }) {
-  const session = sessions.get(senderJid);
+  const key = sessionKey(senderJid);
+  const session = sessions.get(key);
   if (!session) {
     return { handled: false };
   }
 
   if (Date.now() > session.expiresAt) {
-    sessions.delete(senderJid);
+    sessions.delete(key);
     return { handled: true, expired: true };
   }
 
@@ -172,7 +179,7 @@ export function consumeNativeEventIfReady(senderJid, { text, image }) {
     image
   };
 
-  sessions.delete(senderJid);
+  sessions.delete(key);
   return { handled: true, complete: true, payload };
 }
 
