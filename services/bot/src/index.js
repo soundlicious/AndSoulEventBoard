@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import qrcode from "qrcode-terminal";
-import { buildAckMessage } from "./messages.js";
+import { buildAckMessage, buildRsvpReply } from "./messages.js";
 
 const botName = process.env.BOT_NAME || "event-bot";
 const apiBaseUrl = process.env.API_BASE_URL || "http://api:8080";
@@ -15,6 +15,7 @@ const commandPrefix = "/event ";
 const ignoreOldMessages = String(process.env.BOT_IGNORE_OLD_MESSAGES || "true") === "true";
 const startupCutoffMs = Date.now();
 const dmObserveMode = process.env.BOT_DM_OBSERVE_MODE || "all";
+const rsvpPhoneNumber = String(process.env.BOT_RSVP_PHONE_NUMBER || "").trim();
 
 function apiHeaders() {
   const headers = { "content-type": "application/json" };
@@ -59,6 +60,9 @@ function messageTimestampMs(msg) {
 }
 
 function shouldObserveDmMessage(msg, remoteJid) {
+  const text = extractMessageText(msg.message);
+  const normalizedText = (text || "").trim().toLowerCase();
+
   if (dmObserveMode === "self_only") {
     if (!msg.key.fromMe) {
       return false;
@@ -66,9 +70,10 @@ function shouldObserveDmMessage(msg, remoteJid) {
     if (!remoteJid.endsWith("@lid") && !remoteJid.endsWith("@s.whatsapp.net")) {
       return false;
     }
-    const text = extractMessageText(msg.message);
-    const normalizedText = (text || "").trim().toLowerCase();
-    return normalizedText.startsWith(commandPrefix);
+    return normalizedText.startsWith(commandPrefix)
+      || normalizedText.startsWith("/rsvp-event ")
+      || normalizedText.startsWith("/cancel-rsvp-event ")
+      || normalizedText.startsWith("/cancel-event ");
   }
 
   if (msg.key.fromMe && !allowFromMe) {
@@ -138,6 +143,8 @@ function renderEventMessage(event, organiserMentions) {
       .filter(Boolean)
     : [];
 
+  const rsvpLink = buildClickToChatLink(`/RSVP-EVENT ${event.id}`);
+
   return {
     text: [
       `*${event.title}*`,
@@ -150,10 +157,22 @@ function renderEventMessage(event, organiserMentions) {
         : event.googleCalendarHtmlLink
           ? `Calendar: ${event.googleCalendarHtmlLink}`
           : "",
+      rsvpLink ? `RSVP: ${rsvpLink}` : "",
       event.image ? `Image: ${event.image}` : ""
     ].filter(Boolean).join("\n"),
     mentionJids
   };
+}
+
+function buildClickToChatLink(commandText) {
+  if (!rsvpPhoneNumber) {
+    return "";
+  }
+  const phone = rsvpPhoneNumber.replace(/[^0-9]/g, "");
+  if (!phone) {
+    return "";
+  }
+  return `https://wa.me/${phone}?text=${encodeURIComponent(commandText)}`;
 }
 
 async function fetchEvent(eventId) {
@@ -422,6 +441,16 @@ async function startBaileysRuntime() {
         if (json.action === "cancel") {
           await sock.sendMessage(remoteJid, {
             text: json.message || "Cancel request processed"
+          });
+          continue;
+        }
+
+        if (json.action === "rsvp" || json.action === "cancel_rsvp") {
+          const eventId = json.eventId || json.event?.id || "";
+          const rsvpLink = eventId ? buildClickToChatLink(`/RSVP-EVENT ${eventId}`) : "";
+          const cancelRsvpLink = eventId ? buildClickToChatLink(`/CANCEL-RSVP-EVENT ${eventId}`) : "";
+          await sock.sendMessage(remoteJid, {
+            text: buildRsvpReply(json, { rsvpLink, cancelRsvpLink })
           });
           continue;
         }

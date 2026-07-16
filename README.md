@@ -135,6 +135,7 @@ DM observe modes:
 - `BOT_DM_OBSERVE_MODE=all` (default): observe all incoming DMs (subject to `BOT_ALLOW_FROM_ME`).
 - `BOT_DM_OBSERVE_MODE=self_only`: observe only your own self-DM command messages starting with `/event `.
   - Useful for POC where only your own messages-to-self should be processed.
+- `BOT_RSVP_PHONE_NUMBER=<number-with-country-code-no-plus>`: phone number used to generate WhatsApp click-to-chat RSVP links.
 
 ## DM Command Format
 
@@ -146,6 +147,11 @@ Event cancellation syntax (creator only):
 
 `/cancel-event evt_xxxxx`
 
+RSVP commands (via DM or click-to-chat):
+
+- `/RSVP-EVENT evt_xxxxx`
+- `/CANCEL-RSVP-EVENT evt_xxxxx`
+
 Image is not a URL in your flow: send the image attached in the same DM message (with optional caption using `/event ...`).
 
 Notes:
@@ -154,6 +160,7 @@ Notes:
 - `organisers` is optional.
 - If an image is attached, it is downloaded by the bot and sent to API as structured image payload.
 - Event `date + time` must be in the future, otherwise creation is rejected.
+- Event stores RSVP attendees by sender JID and exposes RSVP count for display.
 - Past events are automatically pruned from storage when events are accessed.
 - Attached images are persisted to API media storage and exposed as `/media/<file>` URLs.
 - Oversized media/request payloads are rejected (`MAX_MEDIA_BYTES`, `API_MAX_BODY_BYTES`).

@@ -65,6 +65,7 @@ services:
       - BOT_ALLOW_FROM_ME=${BOT_ALLOW_FROM_ME:-false}
       - BOT_IGNORE_OLD_MESSAGES=${BOT_IGNORE_OLD_MESSAGES:-true}
       - BOT_DM_OBSERVE_MODE=${BOT_DM_OBSERVE_MODE:-all}
+      - BOT_RSVP_PHONE_NUMBER=${BOT_RSVP_PHONE_NUMBER:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
       - TZ=${TZ:-Europe/Madrid}
     volumes:

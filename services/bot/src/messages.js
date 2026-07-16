@@ -35,3 +35,29 @@ export function buildAckMessage(result) {
     `Calendar: ${result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "not configured"}`
   ].join("\n");
 }
+
+export function buildRsvpReply(result, { rsvpLink = "", cancelRsvpLink = "" } = {}) {
+  if (!result || result.ok === false) {
+    return result?.message || "I could not process your RSVP request.";
+  }
+
+  if (result.action === "rsvp") {
+    return [
+      result.message || "RSVP confirmed.",
+      `Event ID: ${result.eventId || "unknown"}`,
+      `RSVP Count: ${Number.isFinite(result.count) ? result.count : 0}`,
+      cancelRsvpLink ? `Cancel RSVP: ${cancelRsvpLink}` : ""
+    ].filter(Boolean).join("\n");
+  }
+
+  if (result.action === "cancel_rsvp") {
+    return [
+      result.message || "RSVP cancelled.",
+      `Event ID: ${result.eventId || "unknown"}`,
+      `RSVP Count: ${Number.isFinite(result.count) ? result.count : 0}`,
+      rsvpLink ? `RSVP Again: ${rsvpLink}` : ""
+    ].filter(Boolean).join("\n");
+  }
+
+  return result.message || "Request processed.";
+}

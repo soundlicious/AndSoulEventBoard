@@ -8,6 +8,7 @@ import {
   validateEventPayload
 } from "@coliving/shared";
 import {
+  addEventRsvp,
   cleanupPastEvents,
   createEvent,
   deleteEvent,
@@ -18,6 +19,7 @@ import {
   listEvents,
   markPublished,
   metrics,
+  removeEventRsvp,
   updateEvent
 } from "./store.js";
 import {
@@ -107,6 +109,22 @@ function parseNewCommand(rawText) {
 
 function parseCancelCommand(rawText) {
   const match = rawText.trim().match(/^\/cancel-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  if (!match) {
+    return null;
+  }
+  return { eventId: match[1] };
+}
+
+function parseRsvpCommand(rawText) {
+  const match = rawText.trim().match(/^\/rsvp-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  if (!match) {
+    return null;
+  }
+  return { eventId: match[1] };
+}
+
+function parseCancelRsvpCommand(rawText) {
+  const match = rawText.trim().match(/^\/cancel-rsvp-event\s+(evt_[a-zA-Z0-9-]+)/i);
   if (!match) {
     return null;
   }
@@ -623,6 +641,63 @@ export function createServer() {
           return;
         }
         const rawText = body.rawText || "";
+
+        const rsvp = parseRsvpCommand(rawText);
+        if (rsvp) {
+          const target = getEvent(rsvp.eventId);
+          if (!target) {
+            json(res, 200, {
+              action: "rsvp",
+              ok: false,
+              message: "Event not found",
+              eventId: rsvp.eventId
+            }, reqId);
+            return;
+          }
+          const result = addEventRsvp(rsvp.eventId, senderJid);
+          const event = getEvent(rsvp.eventId);
+          json(res, 200, {
+            action: "rsvp",
+            ok: true,
+            added: result.added,
+            eventId: rsvp.eventId,
+            count: result.count,
+            event,
+            message: result.added
+              ? `RSVP confirmed for ${rsvp.eventId}`
+              : `RSVP already exists for ${rsvp.eventId}`
+          }, reqId);
+          return;
+        }
+
+        const cancelRsvp = parseCancelRsvpCommand(rawText);
+        if (cancelRsvp) {
+          const target = getEvent(cancelRsvp.eventId);
+          if (!target) {
+            json(res, 200, {
+              action: "cancel_rsvp",
+              ok: false,
+              message: "Event not found",
+              eventId: cancelRsvp.eventId
+            }, reqId);
+            return;
+          }
+          const result = removeEventRsvp(cancelRsvp.eventId, senderJid);
+          const event = getEvent(cancelRsvp.eventId);
+          json(res, 200, {
+            action: "cancel_rsvp",
+            ok: true,
+            removed: result.removed,
+            eventId: cancelRsvp.eventId,
+            count: result.count,
+            event,
+            message: result.removed
+              ? `RSVP cancelled for ${cancelRsvp.eventId}`
+              : `No RSVP found for ${cancelRsvp.eventId}`
+          }, reqId);
+          return;
+        }
+
         const cancel = parseCancelCommand(rawText);
         if (cancel) {
           const target = getEvent(cancel.eventId);

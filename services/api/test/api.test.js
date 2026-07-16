@@ -199,6 +199,68 @@ test("POST /ingest/dm supports cancel-event by creator only", async (t) => {
   assert.equal(checkDeleted.status, 404);
 });
 
+test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const when = futureDateTime(120);
+
+  const createRes = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "RSVP Event",
+      description: "RSVP test",
+      date: when.date,
+      time: when.time
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 201);
+
+  const rsvpRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-rsvp-1",
+      rawText: `/RSVP-EVENT ${created.id}`
+    })
+  });
+  const rsvpJson = await rsvpRes.json();
+  assert.equal(rsvpRes.status, 200);
+  assert.equal(rsvpJson.action, "rsvp");
+  assert.equal(rsvpJson.added, true);
+  assert.equal(rsvpJson.count, 1);
+
+  const rsvpAgainRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-rsvp-2",
+      rawText: `/RSVP-EVENT ${created.id}`
+    })
+  });
+  const rsvpAgainJson = await rsvpAgainRes.json();
+  assert.equal(rsvpAgainRes.status, 200);
+  assert.equal(rsvpAgainJson.added, false);
+  assert.equal(rsvpAgainJson.count, 1);
+
+  const cancelRsvpRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-rsvp-3",
+      rawText: `/CANCEL-RSVP-EVENT ${created.id}`
+    })
+  });
+  const cancelRsvpJson = await cancelRsvpRes.json();
+  assert.equal(cancelRsvpRes.status, 200);
+  assert.equal(cancelRsvpJson.action, "cancel_rsvp");
+  assert.equal(cancelRsvpJson.removed, true);
+  assert.equal(cancelRsvpJson.count, 0);
+});
+
 test("POST /events/:id/publish appends published group jids", async (t) => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));

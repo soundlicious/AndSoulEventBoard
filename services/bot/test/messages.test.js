@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAckMessage } from "../src/messages.js";
+import { buildAckMessage, buildRsvpReply } from "../src/messages.js";
 
 test("buildAckMessage returns success text", () => {
   const text = buildAckMessage({
@@ -35,4 +35,22 @@ test("buildAckMessage includes missing field details", () => {
 test("buildAckMessage handles empty result", () => {
   const text = buildAckMessage(null);
   assert.equal(text.includes("could not process"), true);
+});
+
+test("buildRsvpReply returns RSVP confirmation and cancel link", () => {
+  const text = buildRsvpReply(
+    {
+      action: "rsvp",
+      ok: true,
+      eventId: "evt_123",
+      count: 4,
+      message: "RSVP confirmed"
+    },
+    {
+      cancelRsvpLink: "https://wa.me/34600000000?text=%2FCANCEL-RSVP-EVENT%20evt_123"
+    }
+  );
+  assert.equal(text.includes("RSVP confirmed"), true);
+  assert.equal(text.includes("RSVP Count: 4"), true);
+  assert.equal(text.includes("Cancel RSVP:"), true);
 });

@@ -76,6 +76,7 @@ export function createEvent(payload) {
     publishedGroupJids: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    rsvpSenderJids: [],
     ...payload
   };
 
@@ -99,6 +100,58 @@ export function createEvent(payload) {
   db.events.push(event);
   writeDb(db);
   return event;
+}
+
+function normalizedRsvpList(event) {
+  if (!Array.isArray(event?.rsvpSenderJids)) {
+    return [];
+  }
+  return event.rsvpSenderJids.filter((item) => typeof item === "string" && item.length > 0);
+}
+
+export function addEventRsvp(eventId, senderJid) {
+  const db = withPrunedDb();
+  const idx = db.events.findIndex((item) => item.id === eventId);
+  if (idx === -1) {
+    return { found: false, added: false, count: 0 };
+  }
+
+  const current = normalizedRsvpList(db.events[idx]);
+  if (current.includes(senderJid)) {
+    return { found: true, added: false, count: current.length };
+  }
+
+  const updated = {
+    ...db.events[idx],
+    rsvpSenderJids: [...current, senderJid],
+    updatedAt: new Date().toISOString()
+  };
+  db.events[idx] = updated;
+  writeDb(db);
+  return { found: true, added: true, count: updated.rsvpSenderJids.length };
+}
+
+export function removeEventRsvp(eventId, senderJid) {
+  const db = withPrunedDb();
+  const idx = db.events.findIndex((item) => item.id === eventId);
+  if (idx === -1) {
+    return { found: false, removed: false, count: 0 };
+  }
+
+  const current = normalizedRsvpList(db.events[idx]);
+  if (!current.includes(senderJid)) {
+    return { found: true, removed: false, count: current.length };
+  }
+
+  const next = current.filter((jid) => jid !== senderJid);
+  const updated = {
+    ...db.events[idx],
+    rsvpSenderJids: next,
+    updatedAt: new Date().toISOString()
+  };
+  db.events[idx] = updated;
+  writeDb(db);
+  return { found: true, removed: true, count: next.length };
 }
 
 export function getEvent(id) {
