@@ -45,11 +45,11 @@ const rateLimitMaxGlobal = Number(process.env.RATE_LIMIT_MAX_GLOBAL || 200);
 const perSenderRate = new Map();
 const globalRate = [];
 
-function isFutureEvent(date, time) {
-  if (!date || !time) {
+function isFutureEvent(date, startTime) {
+  if (!date || !startTime) {
     return false;
   }
-  const candidate = new Date(`${date}T${time}:00`);
+  const candidate = new Date(`${date}T${startTime}:00`);
   if (Number.isNaN(candidate.getTime())) {
     return false;
   }
@@ -70,7 +70,8 @@ function renderGroupMessage(event) {
     `*${event.title}*`,
     event.description,
     `Date: ${event.date}`,
-    `Time: ${event.time}`,
+    `Start: ${event.startTime}`,
+    `End: ${event.endTime || "23:59"}`,
     mentionLine,
     imageLine
   ].filter(Boolean).join("\n");
@@ -82,7 +83,7 @@ function parseNewCommand(rawText) {
   }
 
   const pairs = {};
-  const matcher = /(title|date|time|desc|description|organisers)="([^"]*)"/gi;
+  const matcher = /(title|date|starttime|endtime|desc|description|organisers)="([^"]*)"/gi;
   let match = matcher.exec(rawText);
   while (match) {
     pairs[match[1].toLowerCase()] = match[2].trim();
@@ -92,7 +93,7 @@ function parseNewCommand(rawText) {
   const organisersText = pairs.organisers || "";
   const organisers = [...organisersText.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m) => m[1]);
 
-  if (!pairs.title && !pairs.date && !pairs.time && !pairs.desc && !pairs.description) {
+  if (!pairs.title && !pairs.date && !pairs.starttime && !pairs.desc && !pairs.description) {
     return null;
   }
 
@@ -100,7 +101,8 @@ function parseNewCommand(rawText) {
     title: pairs.title || "Community Event",
     description: pairs.desc || pairs.description || "",
     date: pairs.date || new Date().toISOString().slice(0, 10),
-    time: pairs.time || "19:00",
+    startTime: pairs.starttime || "19:00",
+    endTime: pairs.endtime || "23:59",
     organisers,
     image: null,
     parserErrors: []
@@ -377,13 +379,14 @@ function simpleParser(rawText) {
   const title = titleMatch ? titleMatch[1].trim() : "Community Event";
   const description = descriptionMatch ? descriptionMatch[1].trim() : rawText.trim();
   const date = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
-  const time = timeMatch ? timeMatch[1] : "19:00";
+  const startTime = timeMatch ? timeMatch[1] : "19:00";
 
   return {
     title,
     description,
     date,
-    time,
+    startTime,
+    endTime: "23:59",
     organisers: organiserMentions,
     image: imageMatch ? imageMatch[0] : null,
     parserErrors: []
@@ -411,7 +414,7 @@ async function llmParser(rawText) {
   const prompt = [
     "Extract event fields from the message.",
     "Return ONLY valid JSON with keys:",
-    "title, description, date(YYYY-MM-DD), time(HH:mm), organisers(string[]), image(string|null).",
+    "title, description, date(YYYY-MM-DD), startTime(HH:mm), endTime(HH:mm optional), organisers(string[]), image(string|null).",
     `Message: ${rawText}`
   ].join("\n");
 
@@ -451,7 +454,8 @@ async function llmParser(rawText) {
         title: parsed.title || fallback.title,
         description: parsed.description || fallback.description,
         date: parsed.date || fallback.date,
-        time: parsed.time || fallback.time,
+        startTime: parsed.startTime || fallback.startTime,
+        endTime: parsed.endTime || fallback.endTime,
         organisers: Array.isArray(parsed.organisers) ? parsed.organisers : fallback.organisers,
         image: parsed.image || fallback.image,
         parserErrors: []
@@ -557,9 +561,9 @@ export function createServer() {
           image: persistImageIfNeeded(body.image)
         };
         const result = validateEventPayload(normalized);
-        if (result.valid && !isFutureEvent(normalized.date, normalized.time)) {
+        if (result.valid && !isFutureEvent(normalized.date, normalized.startTime)) {
           result.valid = false;
-          result.errors.push("Event date+time must be in the future");
+          result.errors.push("Event date+startTime must be in the future");
         }
         if (!result.valid) {
           json(res, 400, { errors: result.errors }, reqId);
@@ -800,9 +804,9 @@ export function createServer() {
 
         const confidence = computeConfidence(parsed);
         const validation = validateEventPayload(parsed);
-        if (validation.valid && !isFutureEvent(parsed.date, parsed.time)) {
+        if (validation.valid && !isFutureEvent(parsed.date, parsed.startTime)) {
           validation.valid = false;
-          validation.errors.push("Event date+time must be in the future");
+          validation.errors.push("Event date+startTime must be in the future");
         }
         const needsConfirmation = confidence < autoPublishThreshold && confidence >= confirmThreshold;
         const valid = validation.valid;
@@ -840,7 +844,7 @@ export function createServer() {
           estimatedCostUsd,
           valid,
           confidence,
-          requiredFieldsPresent: ["title", "description", "date", "time"].filter((f) => parsed[f]),
+          requiredFieldsPresent: ["title", "description", "date", "startTime"].filter((f) => parsed[f]),
           correctionRequested: needsConfirmation,
           eventId: event?.id || null
         });

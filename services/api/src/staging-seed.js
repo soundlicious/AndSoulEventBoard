@@ -13,12 +13,12 @@ const SAMPLE_IMAGES = [
 ];
 
 const SAMPLE_TEMPLATES = [
-  { title: "Community Breakfast", description: "Fresh coffee, fruits, and shared plans for the day.", time: "08:30", location: "Kitchen Hall" },
-  { title: "Cowork Sprint", description: "Focused deep-work block with short accountability check-ins.", time: "10:00", location: "Workspace" },
-  { title: "Lunch Social", description: "Bring your plate and meet new housemates over lunch.", time: "13:00", location: "Dining Area" },
-  { title: "Yoga Flow", description: "Gentle mobility and breathing session for all levels.", time: "18:30", location: "Studio" },
-  { title: "Board Game Night", description: "Strategy and party games with snacks.", time: "20:00", location: "Lounge" },
-  { title: "Film Club", description: "Curated film screening followed by open discussion.", time: "21:00", location: "Media Room" }
+  { title: "Community Breakfast", description: "Fresh coffee, fruits, and shared plans for the day.", startTime: "08:30", endTime: "09:45", location: "Kitchen Hall" },
+  { title: "Cowork Sprint", description: "Focused deep-work block with short accountability check-ins.", startTime: "10:00", endTime: "12:00", location: "Workspace" },
+  { title: "Lunch Social", description: "Bring your plate and meet new housemates over lunch.", startTime: "13:00", endTime: "14:00", location: "Dining Area" },
+  { title: "Yoga Flow", description: "Gentle mobility and breathing session for all levels.", startTime: "18:30", endTime: "19:30", location: "Studio" },
+  { title: "Board Game Night", description: "Strategy and party games with snacks.", startTime: "20:00", endTime: "22:30", location: "Lounge" },
+  { title: "Film Club", description: "Curated film screening followed by open discussion.", startTime: "21:00", endTime: "23:00", location: "Media Room" }
 ];
 
 function dateStringFromNow(baseNow, daysAhead) {
@@ -50,7 +50,8 @@ export function buildStagingSeedEvents({ now = new Date(), count = 16 } = {}) {
       title: `${template.title} #${i + 1}`,
       description: template.description,
       date: dateStringFromNow(now, dayOffset),
-      time: template.time,
+      startTime: template.startTime,
+      endTime: template.endTime,
       organisers: ["staging", "community"],
       image,
       location: template.location,
@@ -66,6 +67,19 @@ export function buildStagingSeedEvents({ now = new Date(), count = 16 } = {}) {
         needsConfirmation: false
       }
     });
+  }
+
+  if (events.length > 0) {
+    const liveDate = dateStringFromNow(now, 0);
+    events[0] = {
+      ...events[0],
+      title: "Live Now - Community Desk",
+      description: "Drop by now for onboarding and announcements.",
+      date: liveDate,
+      startTime: "00:00",
+      endTime: "23:59",
+      location: "Welcome Lounge"
+    };
   }
 
   return events;
@@ -88,10 +102,10 @@ export function seedStagingEventsIfEnabled({
     return { seeded: generated.length, enabled: true, reset: true };
   }
 
-  const existingIds = new Set(listEvents().map((item) => `${item.title}|${item.date}|${item.time}`));
+  const existingIds = new Set(listEvents().map((item) => `${item.title}|${item.date}|${item.startTime}`));
   let seeded = 0;
   for (const item of generated) {
-    const key = `${item.title}|${item.date}|${item.time}`;
+    const key = `${item.title}|${item.date}|${item.startTime}`;
     if (existingIds.has(key)) {
       continue;
     }

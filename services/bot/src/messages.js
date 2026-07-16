@@ -21,7 +21,7 @@ export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = 
       "I could not create the event.",
       ...details,
       "Please use:",
-      "/event title=\"...\" date=\"YYYY-MM-DD\" time=\"HH:mm\" desc=\"...\" organisers=\"@name @name\"",
+      "/event title=\"...\" date=\"YYYY-MM-DD\" startTime=\"HH:mm\" endTime=\"HH:mm\" desc=\"...\" organisers=\"@name @name\"",
       "You can attach an image in the same message."
     ].join("\n");
   }

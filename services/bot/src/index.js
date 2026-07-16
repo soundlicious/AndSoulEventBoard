@@ -150,7 +150,8 @@ function renderEventMessage(event, organiserMentions) {
       `*${event.title}*`,
       event.description,
       `Date: ${event.date}`,
-      `Time: ${event.time}`,
+      `Start: ${event.startTime}`,
+      `End: ${event.endTime || "23:59"}`,
       `Organisers: ${organisers}`,
       event.googleCalendarPublicAddLink
         ? `Calendar: ${event.googleCalendarPublicAddLink}`
@@ -504,7 +505,7 @@ async function run() {
     await sendIngest(
       "34600000001@s.whatsapp.net",
       `sim-${Date.now()}`,
-      "/event title=\"Community Dinner\" date=\"2026-07-20\" time=\"19:30\" desc=\"Bring a dish to share\" organisers=\"@pablo @maria\""
+      "/event title=\"Community Dinner\" date=\"2026-07-20\" startTime=\"19:30\" endTime=\"22:30\" desc=\"Bring a dish to share\" organisers=\"@pablo @maria\""
     );
   }
 

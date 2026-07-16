@@ -43,7 +43,7 @@ function futureDateTime(minutesAhead = 120) {
   const dd = String(date.getDate()).padStart(2, "0");
   const hh = String(date.getHours()).padStart(2, "0");
   const mi = String(date.getMinutes()).padStart(2, "0");
-  return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
+  return { date: `${yyyy}-${mm}-${dd}`, startTime: `${hh}:${mi}` };
 }
 
 function pastDateTime(minutesAgo = 120) {
@@ -115,7 +115,7 @@ test("POST /ingest/dm creates event and parse log", async (t) => {
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
       messageId: "MSG-1",
-      rawText: `/event title=\"Dinner\" date=\"${when.date}\" time=\"${when.time}\" desc=\"Shared meal\" organisers=\"@pablo @maria\"`,
+      rawText: `/event title=\"Dinner\" date=\"${when.date}\" startTime=\"${when.startTime}\" endTime=\"23:30\" desc=\"Shared meal\" organisers=\"@pablo @maria\"`,
       image: {
         mimeType: "image/jpeg",
         dataBase64: "ZmFrZS1pbWFnZQ=="
@@ -133,7 +133,8 @@ test("POST /ingest/dm creates event and parse log", async (t) => {
   const eventJson = await eventRes.json();
   assert.equal(eventRes.status, 200);
   assert.equal(eventJson.date, when.date);
-  assert.equal(eventJson.time, when.time);
+  assert.equal(eventJson.startTime, when.startTime);
+  assert.equal(eventJson.endTime, "23:30");
   assert.equal(typeof eventJson.image, "string");
   assert.equal(eventJson.image.startsWith("/media/"), true);
 
@@ -164,7 +165,7 @@ test("POST /ingest/dm supports cancel-event by creator only", async (t) => {
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
       messageId: "MSG-create-cancel",
-      rawText: `/event title=\"Cancelable\" date=\"${when.date}\" time=\"${when.time}\" desc=\"temp\"`
+      rawText: `/event title=\"Cancelable\" date=\"${when.date}\" startTime=\"${when.startTime}\" desc=\"temp\"`
     })
   });
   const created = await createIngest.json();
@@ -213,7 +214,7 @@ test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
       title: "RSVP Event",
       description: "RSVP test",
       date: when.date,
-      time: when.time
+      startTime: when.startTime
     })
   });
   const created = await createRes.json();
@@ -280,7 +281,7 @@ test("POST /ingest/dm supports RSVPS-EVENT for creator only", async (t) => {
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
       messageId: "MSG-rsvps-create",
-      rawText: `/event title="RSVP List" date="${when.date}" time="${when.time}" desc="check list"`
+      rawText: `/event title="RSVP List" date="${when.date}" startTime="${when.startTime}" desc="check list"`
     })
   });
   const created = await createIngest.json();
@@ -339,7 +340,7 @@ test("POST /events/:id/publish appends published group jids", async (t) => {
       title: "Workshop",
       description: "Deep work sprint",
       date: when.date,
-      time: when.time,
+      startTime: when.startTime,
       organisers: ["pablo"]
     })
   });
@@ -370,7 +371,7 @@ test("DELETE /events/:id deletes single event", async (t) => {
       title: "Delete me",
       description: "Single delete",
       date: when.date,
-      time: when.time
+      startTime: when.startTime
     })
   });
   const created = await createRes.json();
@@ -401,7 +402,7 @@ test("DELETE /events/:id also removes orphaned calendar QR image", async (t) => 
       title: "Delete with QR",
       description: "Single delete",
       date: when.date,
-      time: when.time,
+      startTime: when.startTime,
       image: {
         mimeType: "image/jpeg",
         dataBase64: "ZmFrZS1pbWFnZQ=="
@@ -449,7 +450,7 @@ test("POST /events/batch-delete deletes multiple events", async (t) => {
         title: `Batch ${i}`,
         description: "Batch delete",
         date: when.date,
-        time: when.time
+        startTime: when.startTime
       })
     });
     const created = await createRes.json();
@@ -483,13 +484,13 @@ test("POST /events rejects events not in future", async (t) => {
       title: "Past Event",
       description: "Should fail",
       date: when.date,
-      time: when.time
+      startTime: when.startTime
     })
   });
   const created = await createRes.json();
   assert.equal(createRes.status, 400);
   assert.equal(Array.isArray(created.errors), true);
-  assert.equal(created.errors.includes("Event date+time must be in the future"), true);
+  assert.equal(created.errors.includes("Event date+startTime must be in the future"), true);
 });
 
 test("GET /events prunes outdated events", async (t) => {
@@ -506,7 +507,7 @@ test("GET /events prunes outdated events", async (t) => {
       title: "Future Event",
       description: "Should stay",
       date: future.date,
-      time: future.time
+      startTime: future.startTime
     })
   });
   const created = await createRes.json();
@@ -519,7 +520,7 @@ test("GET /events prunes outdated events", async (t) => {
     title: "Old",
     description: "Old",
     date: "2001-01-01",
-    time: "09:00",
+    startTime: "09:00",
     status: "confirmed",
     publishedGroupJids: [],
     createdAt: new Date().toISOString(),
@@ -548,7 +549,7 @@ test("stale event media becomes inaccessible after pruning", async (t) => {
       title: "Future Media Event",
       description: "Has image",
       date: future.date,
-      time: future.time,
+      startTime: future.startTime,
       image: {
         mimeType: "image/jpeg",
         dataBase64: "ZmFrZS1pbWFnZQ=="
@@ -566,7 +567,7 @@ test("stale event media becomes inaccessible after pruning", async (t) => {
   const db = JSON.parse(fs.readFileSync(filePath, "utf8"));
   const idx = db.events.findIndex((item) => item.id === created.id);
   db.events[idx].date = "2001-01-01";
-  db.events[idx].time = "00:01";
+  db.events[idx].startTime = "00:01";
   fs.writeFileSync(filePath, JSON.stringify(db, null, 2), "utf8");
 
   await request(baseUrl, "/events", { method: "GET" });
@@ -588,7 +589,7 @@ test("POST /ingest/dm rejects oversized image payload", async (t) => {
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
       messageId: "MSG-oversized",
-      rawText: `/event title=\"Big Image\" date=\"${when.date}\" time=\"${when.time}\" desc=\"Too large\"`,
+      rawText: `/event title=\"Big Image\" date=\"${when.date}\" startTime=\"${when.startTime}\" desc=\"Too large\"`,
       image: {
         mimeType: "image/jpeg",
         dataBase64: oversized
@@ -614,7 +615,7 @@ test("protected routes reject missing internal token", async (t) => {
       title: "Should fail",
       description: "No token",
       date: "2099-01-01",
-      time: "10:00"
+      startTime: "10:00"
     })
   });
   const createJson = await createRes.json();
@@ -656,7 +657,7 @@ test("POST /ingest/dm enforces per-sender rate limit", async (t) => {
       body: JSON.stringify({
         senderJid: "34600999999@s.whatsapp.net",
         messageId: `MSG-rate-${i}`,
-        rawText: `/event title=\"Rate ${i}\" date=\"${when.date}\" time=\"${when.time}\" desc=\"ok\"`
+        rawText: `/event title=\"Rate ${i}\" date=\"${when.date}\" startTime=\"${when.startTime}\" desc=\"ok\"`
       })
     });
     assert.equal(res.status, 200);
@@ -667,7 +668,7 @@ test("POST /ingest/dm enforces per-sender rate limit", async (t) => {
     body: JSON.stringify({
       senderJid: "34600999999@s.whatsapp.net",
       messageId: "MSG-rate-block",
-      rawText: `/event title=\"Rate block\" date=\"${when.date}\" time=\"${when.time}\" desc=\"blocked\"`
+      rawText: `/event title=\"Rate block\" date=\"${when.date}\" startTime=\"${when.startTime}\" desc=\"blocked\"`
     })
   });
   const blockedJson = await blockedRes.json();

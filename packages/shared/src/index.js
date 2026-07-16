@@ -1,4 +1,4 @@
-export const requiredEventFields = ["title", "description", "date", "time"];
+export const requiredEventFields = ["title", "description", "date", "startTime"];
 
 export function hashString(input) {
   let hash = 0;
@@ -21,8 +21,12 @@ export function validateEventPayload(payload) {
     errors.push("Invalid date format, expected YYYY-MM-DD");
   }
 
-  if (payload.time && !/^\d{2}:\d{2}$/.test(payload.time)) {
-    errors.push("Invalid time format, expected HH:mm");
+  if (payload.startTime && !/^\d{2}:\d{2}$/.test(payload.startTime)) {
+    errors.push("Invalid startTime format, expected HH:mm");
+  }
+
+  if (payload.endTime && !/^\d{2}:\d{2}$/.test(payload.endTime)) {
+    errors.push("Invalid endTime format, expected HH:mm");
   }
 
   if (payload.organisers && !Array.isArray(payload.organisers)) {

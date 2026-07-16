@@ -9,8 +9,8 @@ const timezone = process.env.GOOGLE_CALENDAR_TIMEZONE || process.env.DEFAULT_TIM
 const shareBaseUrl = process.env.GOOGLE_CALENDAR_SHARE_BASE_URL || "https://calendar.google.com/calendar/r/eventedit";
 
 function eventDateTime(event) {
-  const start = `${event.date}T${event.time}:00`;
-  const end = event.endAt || start;
+  const start = `${event.date}T${event.startTime}:00`;
+  const end = `${event.date}T${event.endTime || "23:59"}:00`;
   return {
     start: {
       dateTime: start,

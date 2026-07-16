@@ -141,7 +141,7 @@ DM observe modes:
 
 Preferred command syntax:
 
-`/event title="..." date="YYYY-MM-DD" time="HH:mm" desc="..." organisers="@pablo @maria"`
+`/event title="..." date="YYYY-MM-DD" startTime="HH:mm" endTime="HH:mm" desc="..." organisers="@pablo @maria"`
 
 Event cancellation syntax (creator only):
 
@@ -157,10 +157,11 @@ Image is not a URL in your flow: send the image attached in the same DM message 
 
 Notes:
 
-- Required fields: `title`, `date`, `time`, `desc`.
+- Required fields: `title`, `date`, `startTime`, `desc`.
+- Optional field: `endTime` (defaults to `23:59` if omitted).
 - `organisers` is optional.
 - If an image is attached, it is downloaded by the bot and sent to API as structured image payload.
-- Event `date + time` must be in the future, otherwise creation is rejected.
+- Event `date + startTime` must be in the future, otherwise creation is rejected.
 - Event stores RSVP attendees as objects (`senderJid`, `pushName`, `rsvpAt`) and exposes RSVP count for display.
 - Past events are automatically pruned from storage when events are accessed.
 - Attached images are persisted to API media storage and exposed as `/media/<file>` URLs.

@@ -28,11 +28,11 @@ test("buildAckMessage includes missing field details", () => {
     valid: false,
     errors: [
       "Missing required field: date",
-      "Missing required field: time",
-      "Invalid time format, expected HH:mm"
+      "Missing required field: startTime",
+      "Invalid startTime format, expected HH:mm"
     ]
   });
-  assert.equal(text.includes("Missing fields: date, time"), true);
+  assert.equal(text.includes("Missing fields: date, startTime"), true);
   assert.equal(text.includes("Formatting issues:"), true);
   assert.equal(text.includes("/event title="), true);
 });

@@ -11,8 +11,11 @@ test("buildStagingSeedEvents generates future-dated events", () => {
   const items = buildStagingSeedEvents({ now, count: 12 });
   assert.equal(items.length, 12);
 
-  for (const item of items) {
-    const eventDate = new Date(`${item.date}T${item.time}:00Z`);
+  const liveEvents = items.filter((item) => item.date === "2026-07-15" && item.startTime === "00:00" && item.endTime === "23:59");
+  assert.equal(liveEvents.length >= 1, true);
+
+  for (const item of items.slice(1)) {
+    const eventDate = new Date(`${item.date}T${item.startTime}:00Z`);
     assert.equal(eventDate.getTime() > now.getTime(), true);
   }
 });

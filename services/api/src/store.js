@@ -5,10 +5,11 @@ import path from "node:path";
 const dataPath = process.env.EVENTS_FILE_PATH || "/app/data/events.json";
 
 function eventTimestampMs(event) {
-  if (!event?.date || !event?.time) {
+  if (!event?.date) {
     return Number.POSITIVE_INFINITY;
   }
-  const date = new Date(`${event.date}T${event.time}:00`);
+  const endTime = event?.endTime || "23:59";
+  const date = new Date(`${event.date}T${endTime}:00`);
   if (Number.isNaN(date.getTime())) {
     return Number.POSITIVE_INFINITY;
   }
@@ -62,8 +63,8 @@ function writeDb(db) {
 export function listEvents() {
   const db = withPrunedDb();
   return db.events.sort((a, b) => {
-    const aKey = `${a.date || "9999-12-31"}T${a.time || "23:59"}`;
-    const bKey = `${b.date || "9999-12-31"}T${b.time || "23:59"}`;
+    const aKey = `${a.date || "9999-12-31"}T${a.startTime || "23:59"}`;
+    const bKey = `${b.date || "9999-12-31"}T${b.startTime || "23:59"}`;
     return aKey.localeCompare(bKey);
   });
 }
