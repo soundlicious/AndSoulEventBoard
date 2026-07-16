@@ -13,11 +13,13 @@ import {
 const config = window.__DISPLAY_CONFIG__ || {};
 const API_URL = String(config.apiUrl || "http://localhost:8080");
 const MEDIA_BASE_URL = String(config.mediaBaseUrl || API_URL);
+const DISPLAY_TIMEZONE = String(config.timezone || "Europe/London");
 const INTERVAL_MS = Number(config.intervalMs || 8000);
 const MAX_DAYS_AHEAD = Number(config.maxDaysAhead || 30);
 const ENABLE_DEBUG = Boolean(config.enableDebug);
 
 const BUFFER = 6;
+const MIN_LOOP_EVENTS = BUFFER * 2 + 1;
 const THUMB_WIDTH = 110;
 const THUMB_GAP = 24;
 const TRANSITION_MS = 800;
@@ -36,6 +38,8 @@ const state = {
   debugVisible: false,
   isTransitioning: false,
   allThumbs: [],
+  previewBuffer: BUFFER,
+  previewLoopEnabled: true,
   lastRenderedEventId: "",
   lastRenderedSignature: "",
   previewSignature: ""
@@ -171,26 +175,35 @@ function rebuildPreviewTrack(items) {
 
   const originals = items.map((item) => buildThumbElement(item));
   const total = originals.length;
+  const loopEnabled = total >= MIN_LOOP_EVENTS;
+  const loopBuffer = loopEnabled ? Math.min(BUFFER, total) : 0;
+  state.previewBuffer = loopBuffer;
+  state.previewLoopEnabled = loopEnabled;
   const fragment = document.createDocumentFragment();
 
-  for (let i = total - BUFFER; i < total; i += 1) {
-    const clone = originals[i].cloneNode(true);
-    clone.classList.add("clone");
-    fragment.appendChild(clone);
+  if (loopEnabled) {
+    for (let i = total - loopBuffer; i < total; i += 1) {
+      const clone = originals[i].cloneNode(true);
+      clone.classList.add("clone");
+      fragment.appendChild(clone);
+    }
   }
 
   for (const thumb of originals) {
     fragment.appendChild(thumb);
   }
 
-  for (let i = 0; i < BUFFER; i += 1) {
-    const clone = originals[i].cloneNode(true);
-    clone.classList.add("clone");
-    fragment.appendChild(clone);
+  if (loopEnabled) {
+    for (let i = 0; i < loopBuffer; i += 1) {
+      const clone = originals[i].cloneNode(true);
+      clone.classList.add("clone");
+      fragment.appendChild(clone);
+    }
   }
 
   previewTrack.appendChild(fragment);
   state.allThumbs = Array.from(previewTrack.querySelectorAll(".thumbnail"));
+  previewTrack.classList.toggle("no-loop", !loopEnabled);
 }
 
 function updatePreviewPosition({ useTransition = true } = {}) {
@@ -199,7 +212,8 @@ function updatePreviewPosition({ useTransition = true } = {}) {
     return;
   }
 
-  const physicalIndex = state.currentIndex + BUFFER;
+  const loopBuffer = Math.min(state.previewBuffer || BUFFER, totalOriginals);
+  const physicalIndex = state.currentIndex + loopBuffer;
   const viewport = previewTrack.parentElement;
   const viewportWidth = viewport ? viewport.offsetWidth : window.innerWidth;
   const spacing = THUMB_WIDTH + THUMB_GAP;
@@ -208,7 +222,7 @@ function updatePreviewPosition({ useTransition = true } = {}) {
 
   for (let i = 0; i < state.allThumbs.length; i += 1) {
     const thumb = state.allThumbs[i];
-    const logicalIndex = getLogicalIndex(i, BUFFER, totalOriginals);
+    const logicalIndex = getLogicalIndex(i, loopBuffer, totalOriginals);
     thumb.classList.toggle("active", logicalIndex === state.currentIndex);
     thumb.classList.toggle("neighbor", isNeighbor(logicalIndex, state.currentIndex, totalOriginals));
   }
@@ -216,7 +230,7 @@ function updatePreviewPosition({ useTransition = true } = {}) {
   previewTrack.style.transition = useTransition
     ? `transform ${TRANSITION_MS}ms cubic-bezier(0.25, 1, 0.5, 1)`
     : "none";
-  previewTrack.style.transform = `translateX(${targetX}px)`;
+  previewTrack.style.transform = `translate(${targetX}px, -50%)`;
 }
 
 function updateConnection(isConnected) {
@@ -299,6 +313,14 @@ function rotateNext() {
   state.currentIndex += 1;
 
   if (state.currentIndex >= state.events.length) {
+    if (!state.previewLoopEnabled) {
+      state.currentIndex = 0;
+      renderMainSlide(state.events[state.currentIndex], state.currentIndex, state.events.length);
+      updatePreviewPosition({ useTransition: false });
+      state.isTransitioning = false;
+      return;
+    }
+
     updatePreviewPosition({ useTransition: true });
     setTimeout(() => {
       state.currentIndex = 0;
@@ -333,7 +355,11 @@ function scheduleRotation() {
 function tickClock() {
   const el = document.getElementById("clock");
   if (el) {
-    el.textContent = new Date().toLocaleString();
+    const now = new Date();
+    el.textContent = now.toLocaleString("en-GB", {
+      timeZone: DISPLAY_TIMEZONE,
+      hour12: false
+    });
   }
 }
 

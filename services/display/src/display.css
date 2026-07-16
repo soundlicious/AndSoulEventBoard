@@ -60,6 +60,7 @@ body {
   position: relative;
   width: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .slide {
@@ -72,6 +73,7 @@ body {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+  overflow: hidden;
 }
 
 .slide.active {
@@ -87,6 +89,9 @@ body {
   justify-content: center;
   background-color: var(--bg-dark);
   border-right: 1px solid var(--border-color);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .event-meta {
@@ -176,18 +181,26 @@ body {
   align-items: center;
   justify-content: center;
   padding: 3rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .event-image-frame {
   position: relative;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  max-width: min(100%, 760px);
+  max-height: min(100%, 760px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .event-image {
   display: block;
-  max-width: min(100%, 760px);
-  max-height: min(100%, 760px);
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   border-radius: 8px;
   border: 3px solid var(--text-primary);
@@ -201,7 +214,7 @@ body {
   bottom: 0;
   width: 116px;
   height: 116px;
-  transform: translate(50%, 50%);
+  transform: translate(35%, 35%);
   border-radius: 16px;
   background: #ffffff;
   border: 4px solid #ffffff;
@@ -274,7 +287,25 @@ body {
   gap: 1.5rem;
   position: absolute;
   left: 0;
+  top: 50%;
   will-change: transform;
+}
+
+.preview-track.no-loop {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none !important;
+  margin: 0 auto;
+  max-width: calc(100% - 32px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  justify-content: center;
+  scrollbar-width: none;
+}
+
+.preview-track.no-loop::-webkit-scrollbar {
+  display: none;
 }
 
 .thumbnail {

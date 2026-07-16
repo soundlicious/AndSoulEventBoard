@@ -1,4 +1,4 @@
-export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead, enableDebug }) {
+export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead, enableDebug, timezone }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -33,7 +33,8 @@ export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead,
       mediaBaseUrl: ${JSON.stringify(mediaBaseUrl)},
       intervalMs: ${Number.isFinite(interval) ? interval : 8000},
       maxDaysAhead: ${Number.isFinite(maxDaysAhead) ? maxDaysAhead : 30},
-      enableDebug: ${enableDebug ? "true" : "false"}
+      enableDebug: ${enableDebug ? "true" : "false"},
+      timezone: ${JSON.stringify(timezone || "Europe/London")}
     };
   </script>
   <script type="module" src="/display.js"></script>

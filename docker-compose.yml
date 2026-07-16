@@ -11,7 +11,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-file:/app/data/events.sqlite}
       - AB_ASSIGNMENT_MODE=${AB_ASSIGNMENT_MODE:-sender_sticky}
       - AB_FORCE_VARIANT=${AB_FORCE_VARIANT:-}
-      - DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE:-Europe/Madrid}
+      - DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE:-Europe/London}
       - CONFIDENCE_AUTO_PUBLISH=${CONFIDENCE_AUTO_PUBLISH:-0.85}
       - CONFIDENCE_CONFIRM=${CONFIDENCE_CONFIRM:-0.60}
       - LLM_API_URL=${LLM_API_URL}
@@ -19,7 +19,7 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - GOOGLE_CALENDAR_ENABLED=${GOOGLE_CALENDAR_ENABLED:-false}
       - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID}
-      - GOOGLE_CALENDAR_TIMEZONE=${GOOGLE_CALENDAR_TIMEZONE:-Europe/Madrid}
+      - GOOGLE_CALENDAR_TIMEZONE=${GOOGLE_CALENDAR_TIMEZONE:-Europe/London}
       - GOOGLE_CALENDAR_SHARE_BASE_URL=${GOOGLE_CALENDAR_SHARE_BASE_URL:-https://calendar.google.com/calendar/r/eventedit}
       - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
       - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
@@ -33,7 +33,7 @@ services:
       - STAGING_SEED_RESET_ON_START=${STAGING_SEED_RESET_ON_START:-true}
       - STAGING_SEED_EVENTS_COUNT=${STAGING_SEED_EVENTS_COUNT:-16}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
-      - TZ=${TZ:-Europe/Madrid}
+      - TZ=${TZ:-Europe/London}
     ports:
       - "${API_PORT:-8080}:8080"
     volumes:
@@ -69,7 +69,7 @@ services:
       - BOT_EVENT_ENRICH_TIMEOUT_MS=${BOT_EVENT_ENRICH_TIMEOUT_MS:-600000}
       - BOT_PROCESSED_MESSAGE_TTL_MS=${BOT_PROCESSED_MESSAGE_TTL_MS:-300000}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
-      - TZ=${TZ:-Europe/Madrid}
+      - TZ=${TZ:-Europe/London}
     volumes:
       - wa_auth:/app/auth
       - ./config:/app/config:ro
@@ -95,7 +95,8 @@ services:
       - DISPLAY_ENABLE_DEBUG=${DISPLAY_ENABLE_DEBUG:-true}
       - DISPLAY_PROXY_MAX_BODY_BYTES=${DISPLAY_PROXY_MAX_BODY_BYTES:-25165824}
       - DISPLAY_PROXY_MAX_MEDIA_BYTES=${DISPLAY_PROXY_MAX_MEDIA_BYTES:-20971520}
-      - TZ=${TZ:-Europe/Madrid}
+      - DISPLAY_TIMEZONE=${DISPLAY_TIMEZONE:-Europe/London}
+      - TZ=${TZ:-Europe/London}
     ports:
       - "${DISPLAY_PORT:-3000}:3000"
     depends_on:

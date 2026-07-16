@@ -14,6 +14,7 @@ const displayEnableDebug = String(process.env.DISPLAY_ENABLE_DEBUG || "true") ==
 const internalApiToken = process.env.INTERNAL_API_TOKEN || "";
 const proxyMaxBodyBytes = Number(process.env.DISPLAY_PROXY_MAX_BODY_BYTES || 8 * 1024 * 1024);
 const proxyMaxMediaBytes = Number(process.env.DISPLAY_PROXY_MAX_MEDIA_BYTES || 5 * 1024 * 1024);
+const displayTimezone = process.env.DISPLAY_TIMEZONE || process.env.TZ || "Europe/London";
 const hereDir = path.dirname(fileURLToPath(import.meta.url));
 const adminJs = fs.readFileSync(path.join(hereDir, "admin.js"), "utf8");
 const createEventJs = fs.readFileSync(path.join(hereDir, "create-event.js"), "utf8");
@@ -37,7 +38,8 @@ const html = buildDisplayHtml({
   mediaBaseUrl,
   interval,
   maxDaysAhead,
-  enableDebug: displayEnableDebug
+  enableDebug: displayEnableDebug,
+  timezone: displayTimezone
 });
 
 const adminHtml = `<!doctype html>
@@ -377,7 +379,8 @@ const server = http.createServer((req, res) => {
         mediaBaseUrl,
         interval,
         maxDaysAhead,
-        displayEnableDebug
+        displayEnableDebug,
+        displayTimezone
       }
     }));
     return;

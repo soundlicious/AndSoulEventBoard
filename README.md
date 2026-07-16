@@ -203,7 +203,7 @@ Required `.env` keys:
 - `GOOGLE_CALENDAR_ID=<calendar-id>`
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL=<service-account-email>`
 - `GOOGLE_PRIVATE_KEY=<private-key-with-escaped-newlines>`
-- `GOOGLE_CALENDAR_TIMEZONE=Europe/Madrid`
+- `GOOGLE_CALENDAR_TIMEZONE=Europe/London`
 - `GOOGLE_CALENDAR_SHARE_BASE_URL=https://calendar.google.com/calendar/r/eventedit`
 
 Behavior:
@@ -226,6 +226,7 @@ Behavior:
   - `PUBLIC_MEDIA_URL` controls media host when display/API are on different hosts.
   - `DISPLAY_API_SERVER_URL` is display container -> API internal URL (default `http://api:8080`).
   - `DISPLAY_PROXY_MAX_MEDIA_BYTES` and `DISPLAY_PROXY_MAX_BODY_BYTES` cap form upload payloads before proxying (defaults now set for 20MB media).
+  - `DISPLAY_TIMEZONE` controls kiosk clock timezone (default `Europe/London`).
 - If present, `googleCalendarQrImage` is rendered overlapping the event image bottom-right corner (half in / half out) for kiosk scanning.
 - Debug tools:
   - Press `d` on display page to toggle a local debug overlay.
