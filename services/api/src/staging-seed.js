@@ -44,6 +44,7 @@ export function buildStagingSeedEvents({ now = new Date(), count = 16 } = {}) {
       id: `evt_stage_${randomUUID()}`,
       status: "confirmed",
       publishedGroupJids: [],
+      rsvps: [],
       createdAt: new Date(now).toISOString(),
       updatedAt: new Date(now).toISOString(),
       title: `${template.title} #${i + 1}`,

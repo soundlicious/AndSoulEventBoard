@@ -79,7 +79,7 @@ function renderMainSlide(item, index, total) {
     `  </div>`,
     `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.time))}</h1>`,
     `  <p class="event-description">${escapeHtml(item.description || "No description")}</p>`,
-    `  <div class="event-meta"><span class="meta-item">RSVP ${Number.isFinite(item.rsvpCount) ? item.rsvpCount : (Array.isArray(item.rsvpSenderJids) ? item.rsvpSenderJids.length : 0)}</span></div>`,
+    `  <div class="event-meta"><span class="meta-item">RSVP ${Number.isFinite(item.rsvpCount) ? item.rsvpCount : (Array.isArray(item.rsvps) ? item.rsvps.length : 0)}</span></div>`,
     `  <div class="organisers-section">`,
     `    <div class="organisers-title">Hosted by</div>`,
     `    <ul class="organisers-list">${organisers.map((name) => `<li class="organiser-tag">${escapeHtml(name)}</li>`).join("")}</ul>`,

@@ -131,6 +131,14 @@ function parseCancelRsvpCommand(rawText) {
   return { eventId: match[1] };
 }
 
+function parseRsvpsListCommand(rawText) {
+  const match = rawText.trim().match(/^\/rsvps-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  if (!match) {
+    return null;
+  }
+  return { eventId: match[1] };
+}
+
 function json(res, statusCode, payload, reqId) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
@@ -635,6 +643,7 @@ export function createServer() {
       try {
         const body = await parseBody(req);
         const senderJid = body.senderJid || "unknown@s.whatsapp.net";
+        const senderPushName = typeof body.senderPushName === "string" ? body.senderPushName.trim() : "";
         const rate = checkIngestRateLimit(senderJid);
         if (!rate.allowed) {
           json(res, 429, { error: rate.error }, reqId);
@@ -654,7 +663,7 @@ export function createServer() {
             }, reqId);
             return;
           }
-          const result = addEventRsvp(rsvp.eventId, senderJid);
+          const result = addEventRsvp(rsvp.eventId, senderJid, senderPushName);
           const event = getEvent(rsvp.eventId);
           json(res, 200, {
             action: "rsvp",
@@ -694,6 +703,40 @@ export function createServer() {
             message: result.removed
               ? `RSVP cancelled for ${cancelRsvp.eventId}`
               : `No RSVP found for ${cancelRsvp.eventId}`
+          }, reqId);
+          return;
+        }
+
+        const rsvpsList = parseRsvpsListCommand(rawText);
+        if (rsvpsList) {
+          const target = getEvent(rsvpsList.eventId);
+          if (!target) {
+            json(res, 200, {
+              action: "rsvps_list",
+              ok: false,
+              message: "Event not found",
+              eventId: rsvpsList.eventId
+            }, reqId);
+            return;
+          }
+          if (target.createdBy !== senderJid) {
+            json(res, 200, {
+              action: "rsvps_list",
+              ok: false,
+              message: "Only the creator can view RSVP list",
+              eventId: rsvpsList.eventId
+            }, reqId);
+            return;
+          }
+
+          const rsvps = Array.isArray(target.rsvps) ? target.rsvps : [];
+          json(res, 200, {
+            action: "rsvps_list",
+            ok: true,
+            eventId: rsvpsList.eventId,
+            count: rsvps.length,
+            rsvps,
+            message: `RSVP list for ${rsvpsList.eventId}`
           }, reqId);
           return;
         }

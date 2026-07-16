@@ -76,7 +76,7 @@ export function createEvent(payload) {
     publishedGroupJids: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    rsvpSenderJids: [],
+    rsvps: [],
     ...payload
   };
 
@@ -102,33 +102,58 @@ export function createEvent(payload) {
   return event;
 }
 
-function normalizedRsvpList(event) {
-  if (!Array.isArray(event?.rsvpSenderJids)) {
+function normalizedRsvps(event) {
+  if (!Array.isArray(event?.rsvps)) {
     return [];
   }
-  return event.rsvpSenderJids.filter((item) => typeof item === "string" && item.length > 0);
+  return event.rsvps
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      senderJid: typeof item.senderJid === "string" ? item.senderJid : "",
+      pushName: typeof item.pushName === "string" ? item.pushName : "",
+      rsvpAt: typeof item.rsvpAt === "string" ? item.rsvpAt : ""
+    }))
+    .filter((item) => item.senderJid.length > 0);
 }
 
-export function addEventRsvp(eventId, senderJid) {
+export function addEventRsvp(eventId, senderJid, pushName = "") {
   const db = withPrunedDb();
   const idx = db.events.findIndex((item) => item.id === eventId);
   if (idx === -1) {
     return { found: false, added: false, count: 0 };
   }
 
-  const current = normalizedRsvpList(db.events[idx]);
-  if (current.includes(senderJid)) {
+  const current = normalizedRsvps(db.events[idx]);
+  const exists = current.find((item) => item.senderJid === senderJid);
+  if (exists) {
+    if (pushName && exists.pushName !== pushName) {
+      const next = current.map((item) => (item.senderJid === senderJid
+        ? { ...item, pushName }
+        : item));
+      const updated = {
+        ...db.events[idx],
+        rsvps: next,
+        updatedAt: new Date().toISOString()
+      };
+      db.events[idx] = updated;
+      writeDb(db);
+      return { found: true, added: false, count: updated.rsvps.length };
+    }
     return { found: true, added: false, count: current.length };
   }
 
   const updated = {
     ...db.events[idx],
-    rsvpSenderJids: [...current, senderJid],
+    rsvps: [...current, {
+      senderJid,
+      pushName,
+      rsvpAt: new Date().toISOString()
+    }],
     updatedAt: new Date().toISOString()
   };
   db.events[idx] = updated;
   writeDb(db);
-  return { found: true, added: true, count: updated.rsvpSenderJids.length };
+  return { found: true, added: true, count: updated.rsvps.length };
 }
 
 export function removeEventRsvp(eventId, senderJid) {
@@ -138,15 +163,15 @@ export function removeEventRsvp(eventId, senderJid) {
     return { found: false, removed: false, count: 0 };
   }
 
-  const current = normalizedRsvpList(db.events[idx]);
-  if (!current.includes(senderJid)) {
+  const current = normalizedRsvps(db.events[idx]);
+  if (!current.find((item) => item.senderJid === senderJid)) {
     return { found: true, removed: false, count: current.length };
   }
 
-  const next = current.filter((jid) => jid !== senderJid);
+  const next = current.filter((item) => item.senderJid !== senderJid);
   const updated = {
     ...db.events[idx],
-    rsvpSenderJids: next,
+    rsvps: next,
     updatedAt: new Date().toISOString()
   };
   db.events[idx] = updated;

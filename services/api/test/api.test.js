@@ -223,6 +223,7 @@ test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
     method: "POST",
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
+      senderPushName: "Pablo",
       messageId: "MSG-rsvp-1",
       rawText: `/RSVP-EVENT ${created.id}`
     })
@@ -232,11 +233,15 @@ test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
   assert.equal(rsvpJson.action, "rsvp");
   assert.equal(rsvpJson.added, true);
   assert.equal(rsvpJson.count, 1);
+  assert.equal(Array.isArray(rsvpJson.event.rsvps), true);
+  assert.equal(rsvpJson.event.rsvps[0].senderJid, "34600111222@s.whatsapp.net");
+  assert.equal(rsvpJson.event.rsvps[0].pushName, "Pablo");
 
   const rsvpAgainRes = await request(baseUrl, "/ingest/dm", {
     method: "POST",
     body: JSON.stringify({
       senderJid: "34600111222@s.whatsapp.net",
+      senderPushName: "Pablo Updated",
       messageId: "MSG-rsvp-2",
       rawText: `/RSVP-EVENT ${created.id}`
     })
@@ -245,6 +250,7 @@ test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
   assert.equal(rsvpAgainRes.status, 200);
   assert.equal(rsvpAgainJson.added, false);
   assert.equal(rsvpAgainJson.count, 1);
+  assert.equal(rsvpAgainJson.event.rsvps[0].pushName, "Pablo Updated");
 
   const cancelRsvpRes = await request(baseUrl, "/ingest/dm", {
     method: "POST",
@@ -259,6 +265,63 @@ test("POST /ingest/dm supports RSVP and CANCEL-RSVP commands", async (t) => {
   assert.equal(cancelRsvpJson.action, "cancel_rsvp");
   assert.equal(cancelRsvpJson.removed, true);
   assert.equal(cancelRsvpJson.count, 0);
+});
+
+test("POST /ingest/dm supports RSVPS-EVENT for creator only", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const when = futureDateTime(120);
+
+  const createIngest = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-rsvps-create",
+      rawText: `/event title="RSVP List" date="${when.date}" time="${when.time}" desc="check list"`
+    })
+  });
+  const created = await createIngest.json();
+  assert.equal(createIngest.status, 200);
+  assert.equal(Boolean(created.event?.id), true);
+
+  await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600999999@s.whatsapp.net",
+      senderPushName: "Alice",
+      messageId: "MSG-rsvps-rsvp",
+      rawText: `/RSVP-EVENT ${created.event.id}`
+    })
+  });
+
+  const creatorListRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-rsvps-list",
+      rawText: `/RSVPS-EVENT ${created.event.id}`
+    })
+  });
+  const creatorListJson = await creatorListRes.json();
+  assert.equal(creatorListRes.status, 200);
+  assert.equal(creatorListJson.action, "rsvps_list");
+  assert.equal(creatorListJson.ok, true);
+  assert.equal(creatorListJson.count, 1);
+
+  const unauthorizedListRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600777777@s.whatsapp.net",
+      messageId: "MSG-rsvps-list-nope",
+      rawText: `/RSVPS-EVENT ${created.event.id}`
+    })
+  });
+  const unauthorizedListJson = await unauthorizedListRes.json();
+  assert.equal(unauthorizedListRes.status, 200);
+  assert.equal(unauthorizedListJson.ok, false);
 });
 
 test("POST /events/:id/publish appends published group jids", async (t) => {
