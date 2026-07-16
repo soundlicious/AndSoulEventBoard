@@ -36,8 +36,51 @@ const state = {
   debugVisible: false,
   isTransitioning: false,
   allThumbs: [],
-  lastRenderedEventId: ""
+  lastRenderedEventId: "",
+  lastRenderedSignature: "",
+  previewSignature: ""
 };
+
+function eventId(item) {
+  if (!item) {
+    return "";
+  }
+  return String(item.id || `${item.title || ""}|${item.date || ""}|${item.startTime || ""}`);
+}
+
+function rsvpCount(item) {
+  if (Number.isFinite(item?.rsvpCount)) {
+    return item.rsvpCount;
+  }
+  if (Array.isArray(item?.rsvps)) {
+    return item.rsvps.length;
+  }
+  return 0;
+}
+
+function slideSignature(item, index) {
+  if (!item) {
+    return "";
+  }
+  return [
+    eventId(item),
+    String(index),
+    String(item.title || ""),
+    String(item.description || ""),
+    String(item.date || ""),
+    String(item.startTime || ""),
+    String(item.endTime || ""),
+    String(item.location || ""),
+    String(item.image || ""),
+    String(item.googleCalendarQrImage || ""),
+    String(rsvpCount(item)),
+    String(isEventLive(item))
+  ].join("|");
+}
+
+function previewTrackSignature(items) {
+  return items.map((item) => `${eventId(item)}:${item.image || ""}`).join(",");
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -83,7 +126,7 @@ function renderMainSlide(item, index, total, { animate = true } = {}) {
     `  </div>`,
     `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.startTime, item.endTime))}</h1>`,
     `  <p class="event-description">${escapeHtml(item.description || "No description")}</p>`,
-    `  <div class="event-meta"><span class="meta-item">RSVP ${Number.isFinite(item.rsvpCount) ? item.rsvpCount : (Array.isArray(item.rsvps) ? item.rsvps.length : 0)}</span></div>`,
+    `  <div class="event-meta"><span class="meta-item">RSVP ${rsvpCount(item)}</span></div>`,
     `  <div class="organisers-section">`,
     `    <div class="organisers-title">Hosted by</div>`,
     `    <ul class="organisers-list">${organisers.map((name) => `<li class="organiser-tag">${escapeHtml(name)}</li>`).join("")}</ul>`,
@@ -101,6 +144,7 @@ function renderMainSlide(item, index, total, { animate = true } = {}) {
   }
 
   state.lastRenderedEventId = String(item.id || "");
+  state.lastRenderedSignature = slideSignature(item, index);
 
   updateDebugPanel({ currentTitle: item.title || "-", total });
 }
@@ -216,7 +260,11 @@ async function refreshEvents() {
       state.currentIndex = 0;
     }
 
-    rebuildPreviewTrack(state.events);
+    const nextPreviewSignature = previewTrackSignature(state.events);
+    if (state.previewSignature !== nextPreviewSignature) {
+      rebuildPreviewTrack(state.events);
+      state.previewSignature = nextPreviewSignature;
+    }
 
     if (!state.events.length) {
       renderEmptyState();
@@ -224,10 +272,15 @@ async function refreshEvents() {
     }
 
     const current = state.events[state.currentIndex];
-    const currentId = String(current?.id || "");
+    const currentId = eventId(current);
     const shouldAnimate = state.lastRenderedEventId !== currentId;
-    renderMainSlide(current, state.currentIndex, state.events.length, { animate: shouldAnimate });
-    updatePreviewPosition({ useTransition: false });
+    const needsRender = state.lastRenderedSignature !== slideSignature(current, state.currentIndex);
+    if (needsRender) {
+      renderMainSlide(current, state.currentIndex, state.events.length, { animate: shouldAnimate });
+    }
+    if (!state.isTransitioning) {
+      updatePreviewPosition({ useTransition: false });
+    }
   } catch {
     state.lastError = "Failed to fetch events";
     updateConnection(false);
