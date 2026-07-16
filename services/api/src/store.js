@@ -60,6 +60,22 @@ function writeDb(db) {
   fs.writeFileSync(dataPath, JSON.stringify(db, null, 2), "utf8");
 }
 
+function senderIdentity(jid) {
+  return String(jid || "").trim().toLowerCase().split("@")[0] || "";
+}
+
+function sameSender(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+  const aNorm = String(a).trim().toLowerCase();
+  const bNorm = String(b).trim().toLowerCase();
+  if (aNorm === bNorm) {
+    return true;
+  }
+  return senderIdentity(aNorm) === senderIdentity(bNorm);
+}
+
 export function listEvents() {
   const db = withPrunedDb();
   return db.events.sort((a, b) => {
@@ -83,6 +99,13 @@ export function createEvent(payload) {
 
   if (!event.createdBy) {
     event.createdBy = event?.source?.senderJid || null;
+  }
+
+  if (!event.source || typeof event.source !== "object") {
+    event.source = {};
+  }
+  if (!event.source.senderIdentity && event.source.senderJid) {
+    event.source.senderIdentity = senderIdentity(event.source.senderJid);
   }
 
   const senderJid = event?.source?.senderJid;
@@ -125,10 +148,10 @@ export function addEventRsvp(eventId, senderJid, pushName = "") {
   }
 
   const current = normalizedRsvps(db.events[idx]);
-  const exists = current.find((item) => item.senderJid === senderJid);
+  const exists = current.find((item) => sameSender(item.senderJid, senderJid));
   if (exists) {
     if (pushName && exists.pushName !== pushName) {
-      const next = current.map((item) => (item.senderJid === senderJid
+      const next = current.map((item) => (sameSender(item.senderJid, senderJid)
         ? { ...item, pushName }
         : item));
       const updated = {
@@ -165,11 +188,11 @@ export function removeEventRsvp(eventId, senderJid) {
   }
 
   const current = normalizedRsvps(db.events[idx]);
-  if (!current.find((item) => item.senderJid === senderJid)) {
+  if (!current.find((item) => sameSender(item.senderJid, senderJid))) {
     return { found: true, removed: false, count: current.length };
   }
 
-  const next = current.filter((item) => item.senderJid !== senderJid);
+  const next = current.filter((item) => !sameSender(item.senderJid, senderJid));
   const updated = {
     ...db.events[idx],
     rsvps: next,

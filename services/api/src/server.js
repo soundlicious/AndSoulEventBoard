@@ -45,6 +45,22 @@ const rateLimitMaxGlobal = Number(process.env.RATE_LIMIT_MAX_GLOBAL || 200);
 const perSenderRate = new Map();
 const globalRate = [];
 
+function normalizeIdentity(jid) {
+  return String(jid || "").trim().toLowerCase().split("@")[0] || "";
+}
+
+function isSameActor(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+  const aRaw = String(a).trim().toLowerCase();
+  const bRaw = String(b).trim().toLowerCase();
+  if (aRaw === bRaw) {
+    return true;
+  }
+  return normalizeIdentity(aRaw) === normalizeIdentity(bRaw);
+}
+
 function isFutureEvent(date, startTime) {
   if (!date || !startTime) {
     return false;
@@ -231,7 +247,10 @@ function handleRouteError(res, reqId, error) {
     json(res, error.statusCode, { error: error.message }, reqId);
     return;
   }
-  json(res, 400, { error: "Invalid JSON body" }, reqId);
+  const message = typeof error?.message === "string" && error.message.trim().length > 0
+    ? error.message
+    : "Unexpected server error";
+  json(res, 500, { error: message }, reqId);
 }
 
 function isProtectedRoute(method, pathname) {
@@ -340,33 +359,38 @@ function cleanupOrphanMediaFiles() {
 }
 
 async function attachGoogleCalendarData(event) {
-  const sync = await syncCreateToGoogleCalendar(event);
-  if (!sync.ok) {
+  try {
+    const sync = await syncCreateToGoogleCalendar(event);
+    if (!sync.ok) {
+      return event;
+    }
+
+    const qrTargetUrl = calendarQrTargetLink(sync);
+    let qrImagePath = null;
+    if (qrTargetUrl) {
+      try {
+        qrImagePath = await createCalendarQrImage({
+          eventId: event.id,
+          targetUrl: qrTargetUrl,
+          mediaDir
+        });
+      } catch {
+        qrImagePath = null;
+      }
+    }
+
+    const patched = updateEvent(event.id, {
+      googleCalendarEventId: sync.googleEventId,
+      googleCalendarHtmlLink: sync.googleHtmlLink,
+      googleCalendarPublicAddLink: sync.googlePublicAddLink,
+      googleCalendarQrImage: qrImagePath || null
+    });
+
+    return patched || event;
+  } catch (error) {
+    process.stderr.write(`API calendar sync warning eventId=${event.id}: ${error.message || "unknown"}\n`);
     return event;
   }
-
-  const qrTargetUrl = calendarQrTargetLink(sync);
-  let qrImagePath = null;
-  if (qrTargetUrl) {
-    try {
-      qrImagePath = await createCalendarQrImage({
-        eventId: event.id,
-        targetUrl: qrTargetUrl,
-        mediaDir
-      });
-    } catch {
-      qrImagePath = null;
-    }
-  }
-
-  const patched = updateEvent(event.id, {
-    googleCalendarEventId: sync.googleEventId,
-    googleCalendarHtmlLink: sync.googleHtmlLink,
-    googleCalendarPublicAddLink: sync.googlePublicAddLink,
-    googleCalendarQrImage: qrImagePath || null
-  });
-
-  return patched || event;
 }
 
 function simpleParser(rawText) {
@@ -723,7 +747,7 @@ export function createServer() {
             }, reqId);
             return;
           }
-          if (target.createdBy !== senderJid) {
+          if (!isSameActor(target.createdBy, senderJid)) {
             json(res, 200, {
               action: "rsvps_list",
               ok: false,
@@ -756,7 +780,7 @@ export function createServer() {
             }, reqId);
             return;
           }
-          if (target.createdBy !== senderJid) {
+          if (!isSameActor(target.createdBy, senderJid)) {
             json(res, 200, {
               action: "cancel",
               ok: false,

@@ -8,6 +8,14 @@ const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
 const timezone = process.env.GOOGLE_CALENDAR_TIMEZONE || process.env.DEFAULT_TIMEZONE || "UTC";
 const shareBaseUrl = process.env.GOOGLE_CALENDAR_SHARE_BASE_URL || "https://calendar.google.com/calendar/r/eventedit";
 
+function normalizeCalendarId(raw) {
+  return String(raw || "").trim().replace(/^['\"]|['\"]$/g, "");
+}
+
+function isLikelyCalendarId(id) {
+  return id.includes("@") && (id.includes("calendar.google.com") || id.endsWith(".com"));
+}
+
 function eventDateTime(event) {
   const start = `${event.date}T${event.startTime}:00`;
   const end = `${event.date}T${event.endTime || "23:59"}:00`;
@@ -24,8 +32,12 @@ function eventDateTime(event) {
 }
 
 function buildClient() {
-  if (!enabled || !calendarId || !serviceEmail || !privateKey) {
+  const normalizedCalendarId = normalizeCalendarId(calendarId);
+  if (!enabled || !normalizedCalendarId || !serviceEmail || !privateKey) {
     return null;
+  }
+  if (!isLikelyCalendarId(normalizedCalendarId)) {
+    throw new Error(`GOOGLE_CALENDAR_ID looks invalid: '${normalizedCalendarId}'`);
   }
 
   const jwt = new google.auth.JWT({
@@ -60,10 +72,17 @@ export async function syncCreateToGoogleCalendar(event) {
     }
   };
 
-  const response = await client.events.insert({
-    calendarId,
-    requestBody: payload
-  });
+  let response;
+  try {
+    response = await client.events.insert({
+      calendarId: normalizeCalendarId(calendarId),
+      requestBody: payload
+    });
+  } catch (error) {
+    const code = Number(error?.code || error?.response?.status || 0);
+    const details = error?.response?.data?.error?.message || error?.message || "unknown error";
+    throw new Error(`Google Calendar insert failed status=${code || "n/a"} calendarId=${normalizeCalendarId(calendarId)}: ${details}`);
+  }
 
   return {
     ok: true,
@@ -89,13 +108,21 @@ export async function markCancelledInGoogleCalendar(googleEventId, title) {
     ? safeTitle
     : `[CANCELLED] ${safeTitle}`;
 
-  await client.events.patch({
-    calendarId,
-    eventId: googleEventId,
-    requestBody: {
-      summary
+  try {
+    await client.events.patch({
+      calendarId: normalizeCalendarId(calendarId),
+      eventId: googleEventId,
+      requestBody: {
+        summary
+      }
+    });
+  } catch (error) {
+    const code = Number(error?.code || error?.response?.status || 0);
+    if (code === 404) {
+      return { ok: false, skipped: true, reason: "google_event_not_found" };
     }
-  });
+    throw error;
+  }
 
   return { ok: true };
 }
