@@ -1,7 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import qrcode from "qrcode-terminal";
-import { buildAckMessage, buildRsvpReply, buildRsvpsListReply } from "./messages.js";
+import {
+  buildAckMessage,
+  buildNativeEventEnrichmentExpired,
+  buildNativeEventEnrichmentPrompt,
+  buildNativeEventEnrichmentReminder,
+  buildRsvpReply,
+  buildRsvpsListReply
+} from "./messages.js";
+import {
+  collectExpiredNativeSessions,
+  consumeNativeEventIfReady,
+  extractNativeEventDraft,
+  hasOpenNativeEventSession,
+  openNativeEventSession
+} from "./native-event-flow.js";
 
 const botName = process.env.BOT_NAME || "event-bot";
 const apiBaseUrl = process.env.API_BASE_URL || "http://api:8080";
@@ -16,6 +30,8 @@ const ignoreOldMessages = String(process.env.BOT_IGNORE_OLD_MESSAGES || "true") 
 const startupCutoffMs = Date.now();
 const dmObserveMode = process.env.BOT_DM_OBSERVE_MODE || "all";
 const rsvpPhoneNumber = String(process.env.BOT_RSVP_PHONE_NUMBER || "").trim();
+const processedMessageTtlMs = Number(process.env.BOT_PROCESSED_MESSAGE_TTL_MS || 5 * 60 * 1000);
+const processedMessageIds = new Map();
 
 function apiHeaders() {
   const headers = { "content-type": "application/json" };
@@ -34,6 +50,19 @@ function normalizeSenderJid(remoteJid, msg) {
     return participant;
   }
   return remoteJid || "unknown@s.whatsapp.net";
+}
+
+function senderIdentity(jid) {
+  const raw = String(jid || "").trim().toLowerCase();
+  if (!raw) {
+    return "";
+  }
+  return raw.split("@")[0];
+}
+
+function isLikelyGroupJid(value) {
+  const jid = String(value || "").trim();
+  return /^\d+(?:-\d+)?@g\.us$/i.test(jid);
 }
 
 function messageTimestampMs(msg) {
@@ -62,6 +91,10 @@ function messageTimestampMs(msg) {
 function shouldObserveDmMessage(msg, remoteJid) {
   const text = extractMessageText(msg.message);
   const normalizedText = (text || "").trim().toLowerCase();
+  const hasNativeEvent = Boolean(unwrapMessage(msg.message)?.eventMessage);
+  const senderJid = normalizeSenderJid(remoteJid, msg);
+  const hasPendingNative = hasOpenNativeEventSession(senderJid);
+  const startsWithCommand = normalizedText.startsWith("/");
 
   if (dmObserveMode === "self_only") {
     if (!msg.key.fromMe) {
@@ -70,15 +103,45 @@ function shouldObserveDmMessage(msg, remoteJid) {
     if (!remoteJid.endsWith("@lid") && !remoteJid.endsWith("@s.whatsapp.net")) {
       return false;
     }
+    if (hasNativeEvent) {
+      return true;
+    }
+    if (!startsWithCommand) {
+      return false;
+    }
     return normalizedText.startsWith(commandPrefix)
       || normalizedText.startsWith("/rsvp-event ")
       || normalizedText.startsWith("/cancel-rsvp-event ")
-      || normalizedText.startsWith("/cancel-event ");
+      || normalizedText.startsWith("/rsvps-event ")
+      || normalizedText.startsWith("/cancel-event ")
+      || normalizedText.startsWith("/organisers ")
+      || normalizedText.startsWith("/organizers ")
+      || (hasPendingNative && normalizedText.startsWith("/"));
   }
 
   if (msg.key.fromMe && !allowFromMe) {
     return false;
   }
+  if (hasNativeEvent) {
+    return true;
+  }
+  return startsWithCommand;
+}
+
+function shouldProcessMessageId(messageId) {
+  if (!messageId) {
+    return true;
+  }
+  const now = Date.now();
+  for (const [id, ts] of processedMessageIds) {
+    if (now - ts > processedMessageTtlMs) {
+      processedMessageIds.delete(id);
+    }
+  }
+  if (processedMessageIds.has(messageId)) {
+    return false;
+  }
+  processedMessageIds.set(messageId, now);
   return true;
 }
 
@@ -152,17 +215,42 @@ function renderEventMessage(event, organiserMentions) {
       `Date: ${event.date}`,
       `Start: ${event.startTime}`,
       `End: ${event.endTime || "23:59"}`,
+      `Location: ${event.location || "CoLiving space"}`,
       `Organisers: ${organisers}`,
       event.googleCalendarPublicAddLink
         ? `Calendar: ${event.googleCalendarPublicAddLink}`
         : event.googleCalendarHtmlLink
           ? `Calendar: ${event.googleCalendarHtmlLink}`
           : "",
-      rsvpLink ? `RSVP: ${rsvpLink}` : "",
-      event.image ? `Image: ${event.image}` : ""
+      rsvpLink ? `RSVP: ${rsvpLink}` : ""
     ].filter(Boolean).join("\n"),
     mentionJids
   };
+}
+
+async function loadImageBufferForPublish(imagePathOrUrl) {
+  const raw = String(imagePathOrUrl || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const url = raw.startsWith("/media/")
+    ? `${apiBaseUrl}${raw}`
+    : raw;
+
+  if (!/^https?:\/\//i.test(url)) {
+    return null;
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`image fetch failed status=${res.status}`);
+  }
+  const arr = await res.arrayBuffer();
+  if (!arr || arr.byteLength === 0) {
+    return null;
+  }
+  return Buffer.from(arr);
 }
 
 function buildClickToChatLink(commandText) {
@@ -207,6 +295,9 @@ function extractMessageText(message) {
     return "";
   }
   const core = unwrapMessage(message);
+  if (core.eventMessage) {
+    return core.eventMessage.description || core.eventMessage.name || "";
+  }
   return core.conversation
     || core.extendedTextMessage?.text
     || core.imageMessage?.caption
@@ -296,11 +387,17 @@ async function publishViaBaileys(sock, eventId) {
   }
 
   const event = await fetchEvent(eventId);
+  const imageBuffer = event.image
+    ? await loadImageBufferForPublish(event.image).catch((error) => {
+      process.stderr.write(`[${botName}] failed loading event image for publish event=${eventId}: ${error.message}\n`);
+      return null;
+    })
+    : null;
   const message = renderEventMessage(event, organiserMentions);
 
   for (const group of groups) {
     let groupJid = group.jid || "";
-    if (!groupJid && group.name) {
+    if ((!groupJid || !isLikelyGroupJid(groupJid)) && group.name) {
       groupJid = await resolveGroupJidByName(sock, group.name);
     }
 
@@ -309,12 +406,31 @@ async function publishViaBaileys(sock, eventId) {
       continue;
     }
 
-    await sock.sendMessage(groupJid, {
-      text: message.text,
-      mentions: message.mentionJids
-    });
-    process.stdout.write(`[${botName}] baileys sent event=${eventId} groupJid=${groupJid}\n`);
-    await markPublished(eventId, groupJid);
+    process.stdout.write(`[${botName}] publishing event=${eventId} to group='${group.name || "unnamed"}' jid=${groupJid}\n`);
+    try {
+      await sock.sendMessage(
+        groupJid,
+        imageBuffer
+          ? {
+            image: imageBuffer,
+            caption: message.text,
+            mentions: message.mentionJids
+          }
+          : {
+            text: message.text,
+            mentions: message.mentionJids
+          },
+        {
+          linkPreview: false
+        }
+      );
+      process.stdout.write(`[${botName}] baileys sent event=${eventId} groupJid=${groupJid}\n`);
+      await markPublished(eventId, groupJid);
+    } catch (error) {
+      process.stderr.write(
+        `[${botName}] publish failed event=${eventId} groupJid=${groupJid} error=${error.message || "unknown"}\n`
+      );
+    }
   }
 }
 
@@ -389,6 +505,16 @@ async function startBaileysRuntime() {
       }
       const remoteJid = msg.key.remoteJid || "";
       if (!shouldObserveDmMessage(msg, remoteJid)) {
+        const ignoredText = (extractMessageText(msg.message) || "").trim();
+        if (ignoredText.startsWith("/")) {
+          process.stdout.write(
+            `[${botName}] ignored dm remoteJid=${remoteJid} fromMe=${Boolean(msg.key.fromMe)} reason=filter text='${ignoredText.slice(0, 120)}'\n`
+          );
+        }
+        continue;
+      }
+      if (!shouldProcessMessageId(msg.key.id)) {
+        process.stdout.write(`[${botName}] skipping duplicate messageId=${msg.key.id || "unknown"}\n`);
         continue;
       }
       const senderJid = normalizeSenderJid(remoteJid, msg);
@@ -410,8 +536,9 @@ async function startBaileysRuntime() {
       }
       const text = extractMessageText(msg.message);
       const imageMarker = extractImagePayload(msg.message);
+      const nativeDraft = extractNativeEventDraft(unwrapMessage(msg.message));
 
-      if (!text && !imageMarker) {
+      if (!text && !imageMarker && !nativeDraft) {
         await sock.sendMessage(remoteJid, {
           text: "I could not read your message. Please send text using /event ... (you can attach an image)."
         });
@@ -422,6 +549,77 @@ async function startBaileysRuntime() {
         let image = null;
         if (imageMarker) {
           image = await downloadIncomingImage(sock, msg);
+        }
+
+        if (nativeDraft) {
+          const session = openNativeEventSession(senderJid, remoteJid, nativeDraft);
+          const organisersCommand = `/organisers tempId="${session.tempId}", organisers="@pablo @maria"`;
+          const organisersCommandLink = buildClickToChatLink(organisersCommand);
+          await sock.sendMessage(remoteJid, {
+            text: buildNativeEventEnrichmentPrompt({
+              ...nativeDraft,
+              tempId: session.tempId,
+              organisersCommandLink
+            })
+          });
+          continue;
+        }
+
+        const pendingNative = consumeNativeEventIfReady(senderJid, { text, image });
+        if (pendingNative.handled) {
+          process.stdout.write(
+            `[${botName}] native event follow-up sender=${senderJid} complete=${Boolean(pendingNative.complete)} expired=${Boolean(pendingNative.expired)} needOrganisers=${Boolean(pendingNative.needOrganisers)} needImage=${Boolean(pendingNative.needImage)}\n`
+          );
+          if (pendingNative.expired) {
+            await sock.sendMessage(remoteJid, {
+              text: buildNativeEventEnrichmentExpired()
+            });
+            continue;
+          }
+          if (!pendingNative.complete) {
+            await sock.sendMessage(remoteJid, {
+              text: buildNativeEventEnrichmentReminder(pendingNative)
+            });
+            continue;
+          }
+
+          const createRes = await fetch(`${apiBaseUrl}/events`, {
+            method: "POST",
+            headers: apiHeaders(),
+            body: JSON.stringify({
+              ...pendingNative.payload,
+              createdBy: senderJid,
+              source: {
+                channel: "whatsapp_native_event",
+                senderJid,
+                senderIdentity: senderIdentity(senderJid),
+                messageId: msg.key.id || `native_${Date.now()}`
+              }
+            })
+          });
+          const createJson = await createRes.json();
+          if (!createRes.ok) {
+            const details = Array.isArray(createJson.errors)
+              ? createJson.errors.join("; ")
+              : (createJson.error || "unknown error");
+            process.stderr.write(
+              `[${botName}] native event create failed status=${createRes.status} details=${details}\n`
+            );
+            await sock.sendMessage(remoteJid, {
+              text: `I could not publish the event: ${details}`
+            });
+            continue;
+          }
+
+          process.stdout.write(
+            `[${botName}] native event created id=${createJson.id} title=${createJson.title || "unknown"}\n`
+          );
+
+          await sock.sendMessage(remoteJid, {
+            text: buildAckMessage({ valid: true, needsConfirmation: false, event: createJson }, creatorActionLinks(createJson.id || ""))
+          });
+          await publishViaBaileys(sock, createJson.id);
+          continue;
         }
 
         const res = await fetch(`${apiBaseUrl}/ingest/dm`, {
@@ -439,6 +637,9 @@ async function startBaileysRuntime() {
         process.stdout.write(
           `[${botName}] dm ingest status=${res.status} variant=${json.variant ?? "n/a"} valid=${json.valid ?? "n/a"}\n`
         );
+        if (json.action) {
+          process.stdout.write(`[${botName}] dm ingest action=${json.action} ok=${json.ok ?? "n/a"} eventId=${json.eventId || json.event?.id || ""}\n`);
+        }
 
         if (!res.ok) {
           await sock.sendMessage(remoteJid, {
@@ -465,6 +666,7 @@ async function startBaileysRuntime() {
         }
 
         if (json.action === "rsvps_list") {
+          process.stdout.write(`[${botName}] rsvps_list eventId=${json.eventId || "unknown"} ok=${Boolean(json.ok)} count=${json.count ?? 0}\n`);
           await sock.sendMessage(remoteJid, {
             text: buildRsvpsListReply(json)
           });
@@ -483,6 +685,19 @@ async function startBaileysRuntime() {
       }
     }
   });
+
+  setInterval(async () => {
+    const expired = collectExpiredNativeSessions();
+    for (const session of expired) {
+      try {
+        await sock.sendMessage(session.remoteJid, {
+          text: buildNativeEventEnrichmentExpired()
+        });
+      } catch (error) {
+        process.stderr.write(`[${botName}] failed sending native-event expiry message: ${error.message}\n`);
+      }
+    }
+  }, 30000);
 }
 
 async function run() {
@@ -512,6 +727,7 @@ async function run() {
   setInterval(() => {
     process.stdout.write(`[${botName}] heartbeat\n`);
   }, 20000);
+
 }
 
 run().catch((error) => {

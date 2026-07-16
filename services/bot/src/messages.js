@@ -90,3 +90,68 @@ export function buildRsvpsListReply(result) {
     ...lines
   ].join("\n");
 }
+
+export function buildNativeEventEnrichmentPrompt(draft) {
+  const tempId = draft.tempId || "tmp_missing";
+  const organisersCommandLink = String(draft.organisersCommandLink || "").trim();
+  return [
+    "Great, I received your WhatsApp Event draft.",
+    `Temp ID: ${tempId}`,
+    `Title: ${draft.title || "Community Event"}`,
+    `Date: ${draft.date || "unknown"}`,
+    `Start: ${draft.startTime || "unknown"}`,
+    `End: ${draft.endTime || "23:59"}`,
+    "To publish it, reply using this command and attach the event image in the SAME message:",
+    `/organisers tempId="${tempId}", organisers="@pablo @maria"`,
+    organisersCommandLink ? `Quick reply: ${organisersCommandLink}` : "",
+    "The image must be attached (not a URL)."
+  ].filter(Boolean).join("\n");
+}
+
+export function buildNativeEventEnrichmentReminder({
+  needOrganisers,
+  needImage,
+  needCommand,
+  wrongTempId,
+  tempId
+}) {
+  const safeTempId = String(tempId || "tmp_missing");
+  const commandLine = `/organisers tempId="${safeTempId}", organisers="@pablo @maria"`;
+
+  if (wrongTempId) {
+    return [
+      "The provided tempId does not match your pending event draft.",
+      `Please use exactly: ${commandLine}`,
+      "Attach the image in the same message."
+    ].join("\n");
+  }
+
+  if (needCommand) {
+    return [
+      "I could not detect the organisers command format.",
+      `Please use exactly: ${commandLine}`,
+      "Attach the image in the same message."
+    ].join("\n");
+  }
+
+  const parts = [];
+  if (needOrganisers) {
+    parts.push("organisers with syntax organisers=\"@name @name\"");
+  }
+  if (needImage) {
+    parts.push("an attached image");
+  }
+  return [
+    "I still need more details before publishing this event.",
+    `Missing: ${parts.join(" and ") || "details"}.`,
+    `Please use: ${commandLine}`,
+    "Attach image in the same message."
+  ].join("\n");
+}
+
+export function buildNativeEventEnrichmentExpired() {
+  return [
+    "Your pending event draft expired due to no reply.",
+    "Please send the WhatsApp Event again so I can collect organisers and image."
+  ].join("\n");
+}

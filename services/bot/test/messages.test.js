@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAckMessage, buildRsvpReply, buildRsvpsListReply } from "../src/messages.js";
+import {
+  buildAckMessage,
+  buildNativeEventEnrichmentExpired,
+  buildNativeEventEnrichmentPrompt,
+  buildNativeEventEnrichmentReminder,
+  buildRsvpReply,
+  buildRsvpsListReply
+} from "../src/messages.js";
 
 test("buildAckMessage returns success text", () => {
   const text = buildAckMessage({
@@ -72,4 +79,42 @@ test("buildRsvpsListReply renders creator list", () => {
   assert.equal(text.includes("RSVP list for evt_123"), true);
   assert.equal(text.includes("1. Pablo"), true);
   assert.equal(text.includes("2. 34600222222@s.whatsapp.net"), true);
+});
+
+test("buildNativeEventEnrichmentPrompt explains organisers and image requirements", () => {
+  const text = buildNativeEventEnrichmentPrompt({
+    tempId: "tmp_ab12cd34",
+    title: "Native Event",
+    date: "2026-08-10",
+    startTime: "19:00",
+    endTime: "23:59",
+    organisersCommandLink: "https://wa.me/34600000000?text=%2Forganisers%20tempId%3D%22tmp_ab12cd34%22"
+  });
+  assert.equal(text.includes("organisers=\"@pablo @maria\""), true);
+  assert.equal(text.includes("attached"), true);
+  assert.equal(text.includes("Quick reply:"), true);
+});
+
+test("buildNativeEventEnrichmentReminder explains missing fields", () => {
+  const text = buildNativeEventEnrichmentReminder({
+    needOrganisers: true,
+    needImage: true,
+    tempId: "tmp_ab12cd34"
+  });
+  assert.equal(text.includes("Missing:"), true);
+  assert.equal(text.includes("organisers"), true);
+  assert.equal(text.includes("attached image"), true);
+});
+
+test("buildNativeEventEnrichmentReminder handles wrong temp id", () => {
+  const text = buildNativeEventEnrichmentReminder({
+    wrongTempId: true,
+    tempId: "tmp_ab12cd34"
+  });
+  assert.equal(text.includes("tempId does not match"), true);
+});
+
+test("buildNativeEventEnrichmentExpired explains timeout", () => {
+  const text = buildNativeEventEnrichmentExpired();
+  assert.equal(text.includes("expired"), true);
 });
