@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import qrcode from "qrcode-terminal";
-import { buildAckMessage, buildRsvpReply } from "./messages.js";
+import { buildAckMessage, buildRsvpReply, buildRsvpsListReply } from "./messages.js";
 
 const botName = process.env.BOT_NAME || "event-bot";
 const apiBaseUrl = process.env.API_BASE_URL || "http://api:8080";
@@ -173,6 +173,13 @@ function buildClickToChatLink(commandText) {
     return "";
   }
   return `https://wa.me/${phone}?text=${encodeURIComponent(commandText)}`;
+}
+
+function creatorActionLinks(eventId) {
+  return {
+    cancelEventLink: buildClickToChatLink(`/cancel-event ${eventId}`),
+    rsvpsListLink: buildClickToChatLink(`/RSVPS-EVENT ${eventId}`)
+  };
 }
 
 async function fetchEvent(eventId) {
@@ -419,12 +426,13 @@ async function startBaileysRuntime() {
         const res = await fetch(`${apiBaseUrl}/ingest/dm`, {
           method: "POST",
           headers: apiHeaders(),
-          body: JSON.stringify({
-            senderJid,
-            messageId: msg.key.id,
-            rawText: text,
-            image
-          })
+            body: JSON.stringify({
+              senderJid,
+              senderPushName: msg.pushName || "",
+              messageId: msg.key.id,
+              rawText: text,
+              image
+            })
         });
         const json = await res.json();
         process.stdout.write(
@@ -455,8 +463,15 @@ async function startBaileysRuntime() {
           continue;
         }
 
+        if (json.action === "rsvps_list") {
+          await sock.sendMessage(remoteJid, {
+            text: buildRsvpsListReply(json)
+          });
+          continue;
+        }
+
         await sock.sendMessage(remoteJid, {
-          text: buildAckMessage(json)
+          text: buildAckMessage(json, creatorActionLinks(json.event?.id || ""))
         });
 
         if (json.event?.id && !json.needsConfirmation) {

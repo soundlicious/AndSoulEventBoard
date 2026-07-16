@@ -151,6 +151,7 @@ RSVP commands (via DM or click-to-chat):
 
 - `/RSVP-EVENT evt_xxxxx`
 - `/CANCEL-RSVP-EVENT evt_xxxxx`
+- `/RSVPS-EVENT evt_xxxxx` (creator only)
 
 Image is not a URL in your flow: send the image attached in the same DM message (with optional caption using `/event ...`).
 
@@ -160,7 +161,7 @@ Notes:
 - `organisers` is optional.
 - If an image is attached, it is downloaded by the bot and sent to API as structured image payload.
 - Event `date + time` must be in the future, otherwise creation is rejected.
-- Event stores RSVP attendees by sender JID and exposes RSVP count for display.
+- Event stores RSVP attendees as objects (`senderJid`, `pushName`, `rsvpAt`) and exposes RSVP count for display.
 - Past events are automatically pruned from storage when events are accessed.
 - Attached images are persisted to API media storage and exposed as `/media/<file>` URLs.
 - Oversized media/request payloads are rejected (`MAX_MEDIA_BYTES`, `API_MAX_BODY_BYTES`).

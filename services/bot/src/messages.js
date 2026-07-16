@@ -1,4 +1,4 @@
-export function buildAckMessage(result) {
+export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = "" } = {}) {
   if (!result) {
     return "I could not process your message. Please try again.";
   }
@@ -32,7 +32,9 @@ export function buildAckMessage(result) {
     "Event created and published.",
     `Event ID: ${result.event?.id || "unknown"}`,
     `Title: ${result.event?.title || "unknown"}`,
-    `Calendar: ${result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "not configured"}`
+    `Calendar: ${result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "not configured"}`,
+    cancelEventLink ? `Delete Event: ${cancelEventLink}` : "",
+    rsvpsListLink ? `View RSVPs: ${rsvpsListLink}` : ""
   ].join("\n");
 }
 
@@ -60,4 +62,31 @@ export function buildRsvpReply(result, { rsvpLink = "", cancelRsvpLink = "" } = 
   }
 
   return result.message || "Request processed.";
+}
+
+export function buildRsvpsListReply(result) {
+  if (!result || result.ok === false) {
+    return result?.message || "I could not fetch RSVP list.";
+  }
+
+  const list = Array.isArray(result.rsvps) ? result.rsvps : [];
+  if (list.length === 0) {
+    return [
+      `RSVP list for ${result.eventId || "unknown"}`,
+      "No RSVPs yet."
+    ].join("\n");
+  }
+
+  const lines = list.map((item, idx) => {
+    const label = item.pushName
+      ? `${item.pushName} (${item.senderJid})`
+      : `${item.senderJid}`;
+    return `${idx + 1}. ${label}`;
+  });
+
+  return [
+    `RSVP list for ${result.eventId || "unknown"}`,
+    `Total: ${list.length}`,
+    ...lines
+  ].join("\n");
 }
