@@ -4,12 +4,53 @@ const SESSION_TIMEOUT_MS = Number(process.env.BOT_EVENT_ENRICH_TIMEOUT_MS || 10 
 
 const sessions = new Map();
 
-function sessionKey(senderJid) {
+function senderKey(senderJid) {
   return String(senderJid || "").trim().toLowerCase().split("@")[0] || "";
 }
 
-export function hasOpenNativeEventSession(senderJid) {
-  const key = sessionKey(senderJid);
+function remoteKey(remoteJid) {
+  return String(remoteJid || "").trim().toLowerCase();
+}
+
+function sessionKey(senderJid, remoteJid) {
+  return remoteKey(remoteJid) || senderKey(senderJid);
+}
+
+function eventTimezone() {
+  return process.env.DEFAULT_TIMEZONE || process.env.TZ || "Europe/London";
+}
+
+function dateTimePartsFromEpoch(epochSec) {
+  const date = new Date(Number(epochSec || 0) * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return { date: "", time: "" };
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: eventTimezone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  });
+
+  const map = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    date: map.year && map.month && map.day ? `${map.year}-${map.month}-${map.day}` : "",
+    time: map.hour && map.minute ? `${map.hour}:${map.minute}` : ""
+  };
+}
+
+export function hasOpenNativeEventSession(senderJid, remoteJid) {
+  const key = sessionKey(senderJid, remoteJid);
   if (!key) {
     return false;
   }
@@ -98,18 +139,26 @@ export function extractNativeEventDraft(msg) {
       || ""
     );
 
-  let date = "";
-  let startTime = "";
-  if (startTimeMs > 0) {
-    const startDate = new Date(startTimeMs * 1000);
-    date = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-    startTime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
+  const hasAnyEventSignal = Boolean(
+    String(title || "").trim()
+    || String(description || "").trim()
+    || String(location || "").trim()
+    || startTimeMs > 0
+    || endTimeMs > 0
+  );
+  if (!hasAnyEventSignal) {
+    return null;
   }
+
+  const startDateTime = startTimeMs > 0
+    ? dateTimePartsFromEpoch(startTimeMs)
+    : { date: "", time: "" };
+  const date = startDateTime.date;
+  const startTime = startDateTime.time;
 
   let endTime = "";
   if (endTimeMs > 0) {
-    const endDate = new Date(endTimeMs * 1000);
-    endTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+    endTime = dateTimePartsFromEpoch(endTimeMs).time;
   }
 
   return {
@@ -140,7 +189,7 @@ export function nativeDraftMissingFields(draft) {
 }
 
 export function openNativeEventSession(senderJid, remoteJid, draft) {
-  const key = sessionKey(senderJid);
+  const key = sessionKey(senderJid, remoteJid);
   const session = {
     senderJid,
     remoteJid,
@@ -153,8 +202,8 @@ export function openNativeEventSession(senderJid, remoteJid, draft) {
   return session;
 }
 
-export function consumeNativeEventIfReady(senderJid, { text, image }) {
-  const key = sessionKey(senderJid);
+export function consumeNativeEventIfReady(senderJid, { text, image, remoteJid } = {}) {
+  const key = sessionKey(senderJid, remoteJid);
   const session = sessions.get(key);
   if (!session) {
     return { handled: false };

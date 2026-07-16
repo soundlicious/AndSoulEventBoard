@@ -44,6 +44,9 @@ function apiHeaders() {
 }
 
 function normalizeSenderJid(remoteJid, msg) {
+  if (remoteJid && remoteJid.endsWith("@lid")) {
+    return remoteJid;
+  }
   if (remoteJid && remoteJid.endsWith("@s.whatsapp.net")) {
     return remoteJid;
   }
@@ -95,7 +98,7 @@ function shouldObserveDmMessage(msg, remoteJid) {
   const normalizedText = (text || "").trim().toLowerCase();
   const hasNativeEvent = Boolean(unwrapMessage(msg.message)?.eventMessage);
   const senderJid = normalizeSenderJid(remoteJid, msg);
-  const hasPendingNative = hasOpenNativeEventSession(senderJid);
+  const hasPendingNative = hasOpenNativeEventSession(senderJid, remoteJid);
   const startsWithCommand = normalizedText.startsWith("/");
 
   if (dmObserveMode === "self_only") {
@@ -129,11 +132,12 @@ function shouldObserveDmMessage(msg, remoteJid) {
     || normalizedText.startsWith("/organisers ")
     || normalizedText.startsWith("/organizers ");
 
-  if (msg.key.fromMe && !allowFromMe) {
-    return isSupportedCommand;
-  }
   if (hasNativeEvent) {
     return true;
+  }
+
+  if (msg.key.fromMe && !allowFromMe) {
+    return isSupportedCommand;
   }
   return startsWithCommand || (hasPendingNative && normalizedText.startsWith("/"));
 }
@@ -321,7 +325,7 @@ function extractMessageText(message) {
   }
   const core = unwrapMessage(message);
   if (core.eventMessage) {
-    return core.eventMessage.description || core.eventMessage.name || "";
+    return "";
   }
   return core.conversation
     || core.extendedTextMessage?.text
@@ -581,7 +585,7 @@ async function startBaileysRuntime() {
             continue;
           }
           const session = openNativeEventSession(senderJid, remoteJid, nativeDraft);
-          const organisersCommand = `/organisers tempId="${session.tempId}", organisers="organizer_name1,organizer_name2"`;
+          const organisersCommand = `/organisers tempId="${session.tempId}", organisers="@pablo @maria"`;
           const organisersCommandLink = buildClickToChatLink(organisersCommand);
           await sock.sendMessage(remoteJid, {
             text: buildNativeEventEnrichmentPrompt({
@@ -593,7 +597,7 @@ async function startBaileysRuntime() {
           continue;
         }
 
-        const pendingNative = consumeNativeEventIfReady(senderJid, { text, image });
+        const pendingNative = consumeNativeEventIfReady(senderJid, { text, image, remoteJid });
         if (pendingNative.handled) {
           process.stdout.write(
             `[${botName}] native event follow-up sender=${senderJid} complete=${Boolean(pendingNative.complete)} expired=${Boolean(pendingNative.expired)} needOrganisers=${Boolean(pendingNative.needOrganisers)} needImage=${Boolean(pendingNative.needImage)}\n`

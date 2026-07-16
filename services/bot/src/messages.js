@@ -104,18 +104,17 @@ export function buildRsvpsListReply(result) {
 export function buildNativeEventEnrichmentPrompt(draft) {
   const tempId = draft.tempId || "tmp_missing";
   const organisersCommandLink = String(draft.organisersCommandLink || "").trim();
-  const commandLine = `/organisers tempId="${tempId}", organisers="organizer_name1,organizer_name2"`;
+  const commandLine = `/organisers tempId="${tempId}", organisers="@pablo @maria"`;
   if (organisersCommandLink) {
     return [
-      "*To finish creating your event:*",
+      "To finish creating your event:",
       "1) Edit organiser names in the prefilled message",
-      "2) Use this organisers format: \"organizer_name1,organizer_name2\"",
-      "3) Attach one image to that same message",
-      "4) Press Send",
+      "2) Attach one image to that same message",
+      "3) Press Send",
       "",
-      "*Do not remove tempId or quotes.*",
+      "Do not remove tempId or quotes.",
       "",
-      `*Click here to continue:* ${organisersCommandLink}`
+      `Click here to continue: ${organisersCommandLink}`
     ].join("\n");
   }
 
@@ -140,7 +139,7 @@ export function buildNativeEventEnrichmentReminder({
   tempId
 }) {
   const safeTempId = String(tempId || "tmp_missing");
-  const commandLine = `/organisers tempId="${safeTempId}", organisers="organizer_name1,organizer_name2"`;
+  const commandLine = `/organisers tempId="${safeTempId}", organisers="@pablo @maria"`;
 
   if (wrongTempId) {
     return [
@@ -160,7 +159,7 @@ export function buildNativeEventEnrichmentReminder({
 
   const parts = [];
   if (needOrganisers) {
-    parts.push("organisers with syntax organisers=\"organizer_name1,organizer_name2\"");
+    parts.push("organisers with syntax organisers=\"@name @name\"");
   }
   if (needImage) {
     parts.push("an attached image");

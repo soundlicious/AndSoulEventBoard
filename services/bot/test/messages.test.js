@@ -91,12 +91,11 @@ test("buildNativeEventEnrichmentPrompt explains organisers and image requirement
     endTime: "23:59",
     organisersCommandLink: "https://wa.me/34600000000?text=%2Forganisers%20tempId%3D%22tmp_ab12cd34%22"
   });
-  assert.equal(text.includes("*To finish creating your event:*"), true);
-  assert.equal(text.includes("organiser_name1") || text.includes("organizer_name1"), true);
-  assert.equal(text.includes("\"organizer_name1,organizer_name2\""), true);
+  assert.equal(text.includes("To finish creating your event:"), true);
+  assert.equal(text.includes("tempId%3D%22tmp_ab12cd34%22"), true);
   assert.equal(text.includes("1) Edit organiser names"), true);
-  assert.equal(text.includes("*Do not remove tempId or quotes.*"), true);
-  assert.equal(text.includes("*Click here to continue:*"), true);
+  assert.equal(text.includes("Do not remove tempId or quotes."), true);
+  assert.equal(text.includes("Click here to continue:"), true);
   assert.equal(text.includes("https://wa.me/"), true);
 });
 
@@ -107,7 +106,7 @@ test("buildNativeEventEnrichmentReminder explains missing fields", () => {
     tempId: "tmp_ab12cd34"
   });
   assert.equal(text.includes("Missing:"), true);
-  assert.equal(text.includes("organizer_name1,organizer_name2"), true);
+  assert.equal(text.includes("organisers=\"@name @name\""), true);
   assert.equal(text.includes("attached image"), true);
 });
 
