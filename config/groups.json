@@ -5,14 +5,9 @@
   },
   "groups": [
     {
-      "name": "CoLiving Main",
-      "jid": "1203630XXXXXXXX@g.us",
+      "name": "Shoreditch &Soul Villa Events",
+      "jid": "120363413386715014@g.us",
       "enabled": true
-    },
-    {
-      "name": "CoLiving Backup",
-      "jid": "1203630YYYYYYYY@g.us",
-      "enabled": false
     }
   ]
 }

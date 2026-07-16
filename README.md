@@ -114,6 +114,20 @@ You can also define organiser mention mapping in the same file:
 
 If `jid` is missing and only `name` is provided, the bot attempts group-name resolution via Baileys at runtime.
 
+To list all group names and JIDs from your currently linked WhatsApp session:
+
+```bash
+npm run groups:list
+```
+
+Example output:
+
+```text
+Shoreditch &Soul Villa Events => 120363413386715014@g.us
+```
+
+Then set that JID in `config/groups.json`.
+
 Bot reads this file through `GROUPS_CONFIG_PATH` (default `/app/config/groups.json`).
 
 ## Real Baileys Mode
@@ -136,6 +150,7 @@ DM observe modes:
 - `BOT_DM_OBSERVE_MODE=self_only`: observe only your own self-DM command messages starting with `/event `.
   - Useful for POC where only your own messages-to-self should be processed.
 - `BOT_RSVP_PHONE_NUMBER=<number-with-country-code-no-plus>`: phone number used to generate WhatsApp click-to-chat RSVP links.
+- `BOT_PROCESSED_MESSAGE_TTL_MS` deduplicates repeated WhatsApp message IDs (default 5 minutes) to avoid duplicate processing.
 
 ## DM Command Format
 
@@ -152,6 +167,13 @@ RSVP commands (via DM or click-to-chat):
 - `/RSVP-EVENT evt_xxxxx`
 - `/CANCEL-RSVP-EVENT evt_xxxxx`
 - `/RSVPS-EVENT evt_xxxxx` (creator only)
+
+WhatsApp native Event flow:
+
+- If a user sends a native WhatsApp Event card in DM, bot stores a temporary draft.
+- Bot then asks user to reply with command syntax and attach the image in same message:
+  - `/organisers tempId="tmp_xxxxxxxx", organisers="@name @name"`
+- If user does not complete the flow before timeout (`BOT_EVENT_ENRICH_TIMEOUT_MS`, default 10 minutes), draft expires and bot asks to start over.
 
 Image is not a URL in your flow: send the image attached in the same DM message (with optional caption using `/event ...`).
 

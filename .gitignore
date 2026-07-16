@@ -35,6 +35,7 @@ media/
 *.key
 *.p12
 *.crt
+serviceaccount/
 
 # Editor/OS
 .idea/
