@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildAckMessage,
   buildNativeEventEnrichmentExpired,
+  buildNativeEventMissingFieldsWarning,
   buildNativeEventEnrichmentPrompt,
   buildNativeEventEnrichmentReminder,
   buildRsvpReply,
@@ -91,6 +92,8 @@ test("buildNativeEventEnrichmentPrompt explains organisers and image requirement
     organisersCommandLink: "https://wa.me/34600000000?text=%2Forganisers%20tempId%3D%22tmp_ab12cd34%22"
   });
   assert.equal(text.includes("*To finish creating your event:*"), true);
+  assert.equal(text.includes("organiser_name1") || text.includes("organizer_name1"), true);
+  assert.equal(text.includes("\"organizer_name1,organizer_name2\""), true);
   assert.equal(text.includes("1) Edit organiser names"), true);
   assert.equal(text.includes("*Do not remove tempId or quotes.*"), true);
   assert.equal(text.includes("*Click here to continue:*"), true);
@@ -104,7 +107,7 @@ test("buildNativeEventEnrichmentReminder explains missing fields", () => {
     tempId: "tmp_ab12cd34"
   });
   assert.equal(text.includes("Missing:"), true);
-  assert.equal(text.includes("organisers"), true);
+  assert.equal(text.includes("organizer_name1,organizer_name2"), true);
   assert.equal(text.includes("attached image"), true);
 });
 
@@ -119,4 +122,10 @@ test("buildNativeEventEnrichmentReminder handles wrong temp id", () => {
 test("buildNativeEventEnrichmentExpired explains timeout", () => {
   const text = buildNativeEventEnrichmentExpired();
   assert.equal(text.includes("expired"), true);
+});
+
+test("buildNativeEventMissingFieldsWarning explains required fields", () => {
+  const text = buildNativeEventMissingFieldsWarning(["description", "location"]);
+  assert.equal(text.includes("Missing required fields: description, location."), true);
+  assert.equal(text.includes("No draft was created."), true);
 });

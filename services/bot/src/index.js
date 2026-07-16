@@ -4,6 +4,7 @@ import qrcode from "qrcode-terminal";
 import {
   buildAckMessage,
   buildNativeEventEnrichmentExpired,
+  buildNativeEventMissingFieldsWarning,
   buildNativeEventEnrichmentPrompt,
   buildNativeEventEnrichmentReminder,
   buildRsvpReply,
@@ -14,6 +15,7 @@ import {
   consumeNativeEventIfReady,
   extractNativeEventDraft,
   hasOpenNativeEventSession,
+  nativeDraftMissingFields,
   openNativeEventSession
 } from "./native-event-flow.js";
 
@@ -573,8 +575,13 @@ async function startBaileysRuntime() {
         }
 
         if (nativeDraft) {
+          const missing = nativeDraftMissingFields(nativeDraft);
+          if (missing.length > 0) {
+            await sendText(sock, remoteJid, buildNativeEventMissingFieldsWarning(missing));
+            continue;
+          }
           const session = openNativeEventSession(senderJid, remoteJid, nativeDraft);
-          const organisersCommand = `/organisers tempId="${session.tempId}", organisers="@pablo @maria"`;
+          const organisersCommand = `/organisers tempId="${session.tempId}", organisers="organizer_name1,organizer_name2"`;
           const organisersCommandLink = buildClickToChatLink(organisersCommand);
           await sock.sendMessage(remoteJid, {
             text: buildNativeEventEnrichmentPrompt({

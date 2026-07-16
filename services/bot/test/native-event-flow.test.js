@@ -5,6 +5,7 @@ import {
   collectExpiredNativeSessions,
   consumeNativeEventIfReady,
   extractNativeEventDraft,
+  nativeDraftMissingFields,
   openNativeEventSession
 } from "../src/native-event-flow.js";
 
@@ -44,6 +45,17 @@ test("extractNativeEventDraft maps location object", () => {
   assert.equal(draft.location, "Soul Kitchen");
 });
 
+test("nativeDraftMissingFields reports required native-event fields", () => {
+  const missing = nativeDraftMissingFields({
+    title: "",
+    description: "",
+    location: "",
+    startTime: ""
+  });
+
+  assert.deepEqual(missing, ["title", "description", "location", "startTime"]);
+});
+
 test("consumeNativeEventIfReady requires organisers and image", () => {
   openNativeEventSession("a@s.whatsapp.net", "a@s.whatsapp.net", {
     title: "Dinner",
@@ -69,9 +81,32 @@ test("consumeNativeEventIfReady requires organisers and image", () => {
   assert.equal(badTemp.wrongTempId, true);
 
   const complete = consumeNativeEventIfReady("a@s.whatsapp.net", {
-    text: `/organisers tempId="${missing.tempId}", organisers="@pablo @maria"`,
+    text: `/organisers tempId="${missing.tempId}", organisers="organizer_name1,organizer_name2"`,
     image: { mimeType: "image/jpeg", dataBase64: "abc" }
   });
+  assert.equal(complete.complete, true);
+  assert.deepEqual(complete.payload.organisers, ["organizer_name1", "organizer_name2"]);
+});
+
+test("consumeNativeEventIfReady still accepts @mentions format", () => {
+  openNativeEventSession("c@s.whatsapp.net", "c@s.whatsapp.net", {
+    title: "Dinner",
+    description: "desc",
+    date: "2026-08-10",
+    startTime: "19:00",
+    endTime: "23:59"
+  });
+
+  const incomplete = consumeNativeEventIfReady("c@s.whatsapp.net", {
+    text: "hello",
+    image: null
+  });
+
+  const complete = consumeNativeEventIfReady("c@s.whatsapp.net", {
+    text: `/organisers tempId="${incomplete.tempId}", organisers="@pablo @maria"`,
+    image: { mimeType: "image/jpeg", dataBase64: "abc" }
+  });
+
   assert.equal(complete.complete, true);
   assert.deepEqual(complete.payload.organisers, ["pablo", "maria"]);
 });

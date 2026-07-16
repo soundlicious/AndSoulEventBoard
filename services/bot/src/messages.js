@@ -104,13 +104,14 @@ export function buildRsvpsListReply(result) {
 export function buildNativeEventEnrichmentPrompt(draft) {
   const tempId = draft.tempId || "tmp_missing";
   const organisersCommandLink = String(draft.organisersCommandLink || "").trim();
-  const commandLine = `/organisers tempId="${tempId}", organisers="@pablo @maria"`;
+  const commandLine = `/organisers tempId="${tempId}", organisers="organizer_name1,organizer_name2"`;
   if (organisersCommandLink) {
     return [
       "*To finish creating your event:*",
       "1) Edit organiser names in the prefilled message",
-      "2) Attach one image to that same message",
-      "3) Press Send",
+      "2) Use this organisers format: \"organizer_name1,organizer_name2\"",
+      "3) Attach one image to that same message",
+      "4) Press Send",
       "",
       "*Do not remove tempId or quotes.*",
       "",
@@ -139,7 +140,7 @@ export function buildNativeEventEnrichmentReminder({
   tempId
 }) {
   const safeTempId = String(tempId || "tmp_missing");
-  const commandLine = `/organisers tempId="${safeTempId}", organisers="@pablo @maria"`;
+  const commandLine = `/organisers tempId="${safeTempId}", organisers="organizer_name1,organizer_name2"`;
 
   if (wrongTempId) {
     return [
@@ -159,7 +160,7 @@ export function buildNativeEventEnrichmentReminder({
 
   const parts = [];
   if (needOrganisers) {
-    parts.push("organisers with syntax organisers=\"@name @name\"");
+    parts.push("organisers with syntax organisers=\"organizer_name1,organizer_name2\"");
   }
   if (needImage) {
     parts.push("an attached image");
@@ -176,5 +177,16 @@ export function buildNativeEventEnrichmentExpired() {
   return [
     "Your pending event draft expired due to no reply.",
     "Please send the WhatsApp Event again so I can collect organisers and image."
+  ].join("\n");
+}
+
+export function buildNativeEventMissingFieldsWarning(missingFields) {
+  const list = Array.isArray(missingFields) ? missingFields : [];
+  const fields = list.length > 0 ? list.join(", ") : "required fields";
+  return [
+    "I cannot create this event yet.",
+    `Missing required fields: ${fields}.`,
+    "Please edit your WhatsApp Event card and include all required fields: title, description, location, startTime.",
+    "No draft was created."
   ].join("\n");
 }

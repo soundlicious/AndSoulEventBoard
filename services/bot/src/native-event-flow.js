@@ -40,8 +40,27 @@ function parseTimeFromText(text) {
 }
 
 function parseOrganisersFromText(text) {
-  const source = String(text || "");
-  return [...source.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m) => m[1]);
+  const source = String(text || "").trim();
+  if (!source) {
+    return [];
+  }
+
+  if (source.includes(",")) {
+    return source
+      .split(",")
+      .map((item) => item.trim().replace(/^@+/, ""))
+      .filter((item) => item.length > 0);
+  }
+
+  const mentions = [...source.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m) => m[1]);
+  if (mentions.length > 0) {
+    return mentions;
+  }
+
+  return source
+    .split(/\s+/)
+    .map((item) => item.trim().replace(/^@+/, ""))
+    .filter((item) => item.length > 0);
 }
 
 function parseNativeEnrichmentCommand(text) {
@@ -79,13 +98,13 @@ export function extractNativeEventDraft(msg) {
       || ""
     );
 
-  if (!title || !startTimeMs) {
-    return null;
+  let date = "";
+  let startTime = "";
+  if (startTimeMs > 0) {
+    const startDate = new Date(startTimeMs * 1000);
+    date = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
+    startTime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
   }
-
-  const startDate = new Date(startTimeMs * 1000);
-  const date = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
-  const startTime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
 
   let endTime = "";
   if (endTimeMs > 0) {
@@ -101,6 +120,23 @@ export function extractNativeEventDraft(msg) {
     endTime: endTime || "23:59",
     location: String(location || "")
   };
+}
+
+export function nativeDraftMissingFields(draft) {
+  const missing = [];
+  if (!String(draft?.title || "").trim()) {
+    missing.push("title");
+  }
+  if (!String(draft?.description || "").trim()) {
+    missing.push("description");
+  }
+  if (!String(draft?.location || "").trim()) {
+    missing.push("location");
+  }
+  if (!String(draft?.startTime || "").trim()) {
+    missing.push("startTime");
+  }
+  return missing;
 }
 
 export function openNativeEventSession(senderJid, remoteJid, draft) {
