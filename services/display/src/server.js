@@ -203,7 +203,7 @@ const createEventHtml = `<!doctype html>
 <body>
   <main class="wrap">
     <h1>Create Event</h1>
-    <p class="help">Use this form if you prefer not to use WhatsApp. Required fields: title, description, date, time.</p>
+    <p class="help">Use this form if you prefer not to use WhatsApp. Required fields: title, description, date, startTime.</p>
     <div class="toolbar">
       <input id="token" type="password" placeholder="INTERNAL_API_TOKEN" style="min-width:280px" />
       <button id="save-token">Save token</button>
@@ -224,8 +224,12 @@ const createEventHtml = `<!doctype html>
           <input id="date" name="date" type="date" required />
         </div>
         <div class="row">
-          <label for="time">Time *</label>
-          <input id="time" name="time" type="time" required />
+          <label for="startTime">Start Time *</label>
+          <input id="startTime" name="startTime" type="time" required />
+        </div>
+        <div class="row">
+          <label for="endTime">End Time (optional)</label>
+          <input id="endTime" name="endTime" type="time" />
         </div>
       </div>
       <div class="row">

@@ -24,7 +24,7 @@ function setStatus(message, isError = false) {
 }
 
 function fmtDate(item) {
-  return `${item.date || "-"} ${item.time || "-"}`;
+  return `${item.date || "-"} ${item.startTime || "-"}${item.endTime ? `-${item.endTime}` : ""}`;
 }
 
 function row(item) {

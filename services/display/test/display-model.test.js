@@ -5,6 +5,7 @@ import {
   dayLabel,
   formatDateTime,
   getLogicalIndex,
+  isEventLive,
   isNeighbor,
   normalizeEvents,
   organisersForDisplay,
@@ -15,7 +16,7 @@ import {
 
 test("formatDateTime handles missing date", () => {
   assert.equal(formatDateTime("", "12:00"), "Unknown date");
-  assert.equal(formatDateTime("2026-07-30", "09:30"), "2026-07-30 09:30");
+  assert.equal(formatDateTime("2026-07-30", "09:30", "10:30"), "2026-07-30 09:30-10:30");
 });
 
 test("dayLabel returns expected labels", () => {
@@ -29,11 +30,11 @@ test("dayLabel returns expected labels", () => {
 test("shouldKeepEvent enforces max days ahead", () => {
   const now = new Date("2026-07-15T08:00:00Z");
   assert.equal(
-    shouldKeepEvent({ date: "2026-07-20", time: "10:00" }, { now, maxDaysAhead: 7 }),
+    shouldKeepEvent({ date: "2026-07-20", startTime: "10:00" }, { now, maxDaysAhead: 7 }),
     true
   );
   assert.equal(
-    shouldKeepEvent({ date: "2026-08-10", time: "10:00" }, { now, maxDaysAhead: 7 }),
+    shouldKeepEvent({ date: "2026-08-10", startTime: "10:00" }, { now, maxDaysAhead: 7 }),
     false
   );
 });
@@ -42,8 +43,8 @@ test("normalizeEvents keeps only valid range", () => {
   const now = new Date("2026-07-15T08:00:00Z");
   const result = normalizeEvents(
     [
-      { id: "a", date: "2026-07-16", time: "10:00" },
-      { id: "b", date: "2026-09-16", time: "10:00" },
+      { id: "a", date: "2026-07-16", startTime: "10:00" },
+      { id: "b", date: "2026-09-16", startTime: "10:00" },
       { id: "c" }
     ],
     { now, maxDaysAhead: 10 }
@@ -77,4 +78,10 @@ test("preview index helpers support circular behavior", () => {
   assert.equal(isNeighbor(19, 0, 20), true);
   assert.equal(isNeighbor(1, 0, 20), true);
   assert.equal(isNeighbor(3, 0, 20), false);
+});
+
+test("isEventLive checks date window", () => {
+  const now = new Date("2026-07-15T12:00:00");
+  assert.equal(isEventLive({ date: "2026-07-15", startTime: "11:00", endTime: "13:00" }, now), true);
+  assert.equal(isEventLive({ date: "2026-07-15", startTime: "13:01", endTime: "15:00" }, now), false);
 });

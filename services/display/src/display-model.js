@@ -1,8 +1,17 @@
-export function formatDateTime(date, time) {
+export function formatDateTime(date, startTime, endTime) {
   if (!date) {
     return "Unknown date";
   }
-  return time ? `${date} ${time}` : date;
+  if (!startTime && !endTime) {
+    return date;
+  }
+  if (startTime && endTime) {
+    return `${date} ${startTime}-${endTime}`;
+  }
+  if (startTime) {
+    return `${date} ${startTime}`;
+  }
+  return `${date} until ${endTime}`;
 }
 
 export function dayLabel(dateValue, now = new Date()) {
@@ -26,8 +35,18 @@ export function shouldKeepEvent(event, { now = new Date(), maxDaysAhead = 30 } =
     return true;
   }
   const limit = new Date(now.getTime() + maxDaysAhead * 24 * 60 * 60 * 1000);
-  const target = new Date(`${event.date}T${event.time || "23:59"}:00`);
+  const target = new Date(`${event.date}T${event.startTime || "23:59"}:00`);
   return target.getTime() <= limit.getTime();
+}
+
+export function isEventLive(event, now = new Date()) {
+  if (!event?.date || !event?.startTime) {
+    return false;
+  }
+  const start = new Date(`${event.date}T${event.startTime}:00`);
+  const end = new Date(`${event.date}T${event.endTime || "23:59"}:00`);
+  const nowMs = now.getTime();
+  return nowMs >= start.getTime() && nowMs <= end.getTime();
 }
 
 export function normalizeEvents(items, { now = new Date(), maxDaysAhead = 30 } = {}) {

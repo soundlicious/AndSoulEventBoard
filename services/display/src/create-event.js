@@ -35,12 +35,13 @@ async function submitForm(event) {
   const title = form.title.value.trim();
   const description = form.description.value.trim();
   const date = form.date.value;
-  const time = form.time.value;
+  const startTime = form.startTime.value;
+  const endTime = form.endTime.value;
   const organisers = organisersToArray(form.organisers.value);
   const file = form.image.files[0];
 
-  if (!title || !description || !date || !time) {
-    setStatus("Please fill title, description, date, and time.", true);
+  if (!title || !description || !date || !startTime) {
+    setStatus("Please fill title, description, date, and start time.", true);
     return;
   }
 
@@ -48,9 +49,13 @@ async function submitForm(event) {
     title,
     description,
     date,
-    time,
+    startTime,
     organisers
   };
+
+  if (endTime) {
+    payload.endTime = endTime;
+  }
 
   if (file) {
     if (file.size > MAX_IMAGE_BYTES) {

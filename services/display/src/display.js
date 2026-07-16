@@ -2,6 +2,7 @@ import {
   dayLabel,
   formatDateTime,
   getLogicalIndex,
+  isEventLive,
   isNeighbor,
   normalizeEvents,
   organisersForDisplay,
@@ -34,7 +35,8 @@ const state = {
   lastError: null,
   debugVisible: false,
   isTransitioning: false,
-  allThumbs: []
+  allThumbs: [],
+  lastRenderedEventId: ""
 };
 
 function escapeHtml(value) {
@@ -51,9 +53,10 @@ function renderEmptyState() {
   previewTrack.innerHTML = "";
 }
 
-function renderMainSlide(item, index, total) {
+function renderMainSlide(item, index, total, { animate = true } = {}) {
   const organisers = organisersForDisplay(item.organisers);
-  const label = dayLabel(item.date);
+  const isLive = isEventLive(item);
+  const label = isLive ? "Live" : dayLabel(item.date);
   const location = item.location || "CoLiving space";
   const titlePrefix = String(index + 1).padStart(2, "0");
   const imageUrl = resolveImageUrl(item.image, MEDIA_BASE_URL);
@@ -63,6 +66,7 @@ function renderMainSlide(item, index, total) {
     ? [
       `<div class="event-image-frame">`,
       `  <img class="event-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.title || "Event image")}" />`,
+      isLive ? `  <span class="live-tag">LIVE</span>` : "",
       qrImageUrl
         ? `  <img class="event-qr" src="${escapeHtml(qrImageUrl)}" alt="Calendar QR code" />`
         : "",
@@ -73,11 +77,11 @@ function renderMainSlide(item, index, total) {
   mainSlide.innerHTML = [
     `<div class="event-details">`,
     `  <div class="event-meta">`,
-    `    <span class="meta-item">${escapeHtml(label)} • ${escapeHtml(item.time || "--:--")}</span>`,
+    `    <span class="meta-item">${escapeHtml(label)} • ${escapeHtml(item.startTime || "--:--")}</span>`,
     `    <span class="meta-separator">•</span>`,
     `    <span class="event-location">${escapeHtml(location)}</span>`,
     `  </div>`,
-    `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.time))}</h1>`,
+    `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.startTime, item.endTime))}</h1>`,
     `  <p class="event-description">${escapeHtml(item.description || "No description")}</p>`,
     `  <div class="event-meta"><span class="meta-item">RSVP ${Number.isFinite(item.rsvpCount) ? item.rsvpCount : (Array.isArray(item.rsvps) ? item.rsvps.length : 0)}</span></div>`,
     `  <div class="organisers-section">`,
@@ -89,8 +93,14 @@ function renderMainSlide(item, index, total) {
   ].join("");
 
   const slideEl = mainSlide;
-  slideEl.classList.remove("active");
-  requestAnimationFrame(() => slideEl.classList.add("active"));
+  if (animate) {
+    slideEl.classList.remove("active");
+    requestAnimationFrame(() => slideEl.classList.add("active"));
+  } else {
+    slideEl.classList.add("active");
+  }
+
+  state.lastRenderedEventId = String(item.id || "");
 
   updateDebugPanel({ currentTitle: item.title || "-", total });
 }
@@ -213,7 +223,10 @@ async function refreshEvents() {
       return;
     }
 
-    renderMainSlide(state.events[state.currentIndex], state.currentIndex, state.events.length);
+    const current = state.events[state.currentIndex];
+    const currentId = String(current?.id || "");
+    const shouldAnimate = state.lastRenderedEventId !== currentId;
+    renderMainSlide(current, state.currentIndex, state.events.length, { animate: shouldAnimate });
     updatePreviewPosition({ useTransition: false });
   } catch {
     state.lastError = "Failed to fetch events";
