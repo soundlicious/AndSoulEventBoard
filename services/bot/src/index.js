@@ -34,6 +34,27 @@ const dmObserveMode = process.env.BOT_DM_OBSERVE_MODE || "all";
 const rsvpPhoneNumber = String(process.env.BOT_RSVP_PHONE_NUMBER || "").trim();
 const processedMessageTtlMs = Number(process.env.BOT_PROCESSED_MESSAGE_TTL_MS || 5 * 60 * 1000);
 const processedMessageIds = new Map();
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+
+function scheduleReconnect() {
+  if (reconnectTimer) {
+    return;
+  }
+  const baseDelayMs = 3000;
+  const maxDelayMs = 30000;
+  const jitterMs = Math.floor(Math.random() * 1000);
+  const delayMs = Math.min(maxDelayMs, baseDelayMs * (2 ** reconnectAttempts)) + jitterMs;
+  reconnectAttempts += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startBaileysRuntime().catch((error) => {
+      process.stderr.write(`[${botName}] reconnect failed: ${error.message}\n`);
+      scheduleReconnect();
+    });
+  }, delayMs);
+  process.stderr.write(`[${botName}] reconnect scheduled in ${delayMs}ms (attempt ${reconnectAttempts})\n`);
+}
 
 function apiHeaders() {
   const headers = { "content-type": "application/json" };
@@ -494,12 +515,20 @@ async function startBaileysRuntime() {
   const baileys = await import("baileys");
   const makeWASocket = baileys.default;
   const useMultiFileAuthState = baileys.useMultiFileAuthState;
+  const fetchLatestWaWebVersion = baileys.fetchLatestWaWebVersion;
+  const DisconnectReason = baileys.DisconnectReason;
+
+  const { version } = await fetchLatestWaWebVersion().catch(() => ({ version: undefined }));
+  if (version) {
+    process.stdout.write(`[${botName}] using WA version ${version.join(".")}\n`);
+  }
 
   fs.mkdirSync(authDir, { recursive: true });
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
   const sock = makeWASocket({
     auth: state,
-    browser: ["CoLivingEventBot", "Chrome", "1.0.0"]
+    browser: ["CoLivingEventBot", "Chrome", "1.0.0"],
+    ...(version && { version })
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -510,17 +539,22 @@ async function startBaileysRuntime() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
+      reconnectAttempts = 0;
       process.stdout.write(`[${botName}] Baileys connected\n`);
     }
     if (connection === "close") {
+      const statusCode = lastDisconnect?.error?.output?.statusCode
+        || lastDisconnect?.error?.statusCode
+        || 0;
       process.stderr.write(
-        `[${botName}] Baileys disconnected; reason=${lastDisconnect?.error?.message || "unknown"}\n`
+        `[${botName}] Baileys disconnected; reason=${lastDisconnect?.error?.message || "unknown"} status=${statusCode || "n/a"}\n`
       );
-      setTimeout(() => {
-        startBaileysRuntime().catch((error) => {
-          process.stderr.write(`[${botName}] reconnect failed: ${error.message}\n`);
-        });
-      }, 3000);
+      process.stderr.write(`[${botName}] DEBUG disconnect error: ${JSON.stringify(lastDisconnect?.error?.data || lastDisconnect?.error || {})}\n`);
+      if (statusCode === DisconnectReason?.loggedOut) {
+        process.stderr.write(`[${botName}] session logged out from WhatsApp. Re-scan QR to restore session.\n`);
+        return;
+      }
+      scheduleReconnect();
     }
   });
 
