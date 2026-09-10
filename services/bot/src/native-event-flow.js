@@ -157,8 +157,11 @@ export function extractNativeEventDraft(msg) {
   const startTime = startDateTime.time;
 
   let endTime = "";
+  let endDate = "";
   if (endTimeMs > 0) {
-    endTime = dateTimePartsFromEpoch(endTimeMs).time;
+    const endDateTime = dateTimePartsFromEpoch(endTimeMs);
+    endTime = endDateTime.time;
+    endDate = endDateTime.date;
   }
 
   return {
@@ -166,6 +169,7 @@ export function extractNativeEventDraft(msg) {
     description,
     date,
     startTime,
+    endDate: endDate || date,
     endTime: endTime || "23:59",
     location: String(location || "")
   };
@@ -258,6 +262,7 @@ export function consumeNativeEventIfReady(senderJid, { text, image, remoteJid } 
     description: session.draft.description || "",
     date: maybeDate || session.draft.date,
     startTime: maybeStartTime || session.draft.startTime,
+    endDate: session.draft.endDate || session.draft.date,
     endTime: session.draft.endTime || "23:59",
     location: session.draft.location || undefined,
     organisers,

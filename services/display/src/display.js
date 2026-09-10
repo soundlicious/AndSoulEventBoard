@@ -128,7 +128,7 @@ function renderMainSlide(item, index, total, { animate = true } = {}) {
     `    <span class="meta-separator">•</span>`,
     `    <span class="event-location">${escapeHtml(location)}</span>`,
     `  </div>`,
-    `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.startTime, item.endTime))}</h1>`,
+    `  <h1 class="event-title"><span>${titlePrefix}. ${escapeHtml(item.title || "Untitled Event")}</span>${escapeHtml(formatDateTime(item.date, item.startTime, item.endTime, item.endDate))}</h1>`,
     `  <p class="event-description">${escapeHtml(item.description || "No description")}</p>`,
     `  <div class="event-meta"><span class="meta-item">RSVP ${rsvpCount(item)}</span></div>`,
     `  <div class="organisers-section">`,

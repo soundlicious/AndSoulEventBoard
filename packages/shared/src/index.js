@@ -1,5 +1,13 @@
 export const requiredEventFields = ["title", "description", "date", "startTime"];
 
+function resolvedStartDate(payload) {
+  return payload?.date || payload?.startDate || "";
+}
+
+function resolvedStartTime(payload) {
+  return payload?.startTime || payload?.time || "";
+}
+
 export function hashString(input) {
   let hash = 0;
   for (let i = 0; i < input.length; i += 1) {
@@ -11,22 +19,41 @@ export function hashString(input) {
 
 export function validateEventPayload(payload) {
   const errors = [];
-  for (const field of requiredEventFields) {
-    if (!payload[field] || String(payload[field]).trim() === "") {
-      errors.push(`Missing required field: ${field}`);
-    }
+  if (!payload?.title || String(payload.title).trim() === "") {
+    errors.push("Missing required field: title");
+  }
+  if (!payload?.description || String(payload.description).trim() === "") {
+    errors.push("Missing required field: description");
   }
 
-  if (payload.date && !/^\d{4}-\d{2}-\d{2}$/.test(payload.date)) {
+  const startDate = resolvedStartDate(payload);
+  if (!startDate || String(startDate).trim() === "") {
+    errors.push("Missing required field: date");
+  }
+
+  const startTime = resolvedStartTime(payload);
+  if (!startTime || String(startTime).trim() === "") {
+    errors.push("Missing required field: startTime");
+  }
+
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
     errors.push("Invalid date format, expected YYYY-MM-DD");
   }
 
-  if (payload.startTime && !/^\d{2}:\d{2}$/.test(payload.startTime)) {
+  if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) {
     errors.push("Invalid startTime format, expected HH:mm");
+  }
+
+  if (payload.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(payload.endDate)) {
+    errors.push("Invalid endDate format, expected YYYY-MM-DD");
   }
 
   if (payload.endTime && !/^\d{2}:\d{2}$/.test(payload.endTime)) {
     errors.push("Invalid endTime format, expected HH:mm");
+  }
+
+  if (startDate && payload.endDate && payload.endDate < startDate) {
+    errors.push("endDate cannot be earlier than date");
   }
 
   if (payload.organisers && !Array.isArray(payload.organisers)) {

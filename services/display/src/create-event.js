@@ -36,6 +36,7 @@ async function submitForm(event) {
   const description = form.description.value.trim();
   const date = form.date.value;
   const startTime = form.startTime.value;
+  const endDate = form.endDate.value;
   const endTime = form.endTime.value;
   const organisers = organisersToArray(form.organisers.value);
   const file = form.image.files[0];
@@ -55,6 +56,9 @@ async function submitForm(event) {
 
   if (endTime) {
     payload.endTime = endTime;
+  }
+  if (endDate) {
+    payload.endDate = endDate;
   }
 
   if (file) {

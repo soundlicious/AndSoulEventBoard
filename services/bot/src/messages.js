@@ -21,13 +21,22 @@ export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = 
       "I could not create the event.",
       ...details,
       "Please use:",
-      "/event title=\"...\" date=\"YYYY-MM-DD\" startTime=\"HH:mm\" endTime=\"HH:mm\" desc=\"...\" organisers=\"@name @name\"",
+      "/event title=\"...\" startDate=\"YYYY-MM-DD\" startTime=\"HH:mm\" endDate=\"YYYY-MM-DD\" endTime=\"HH:mm\" desc=\"...\" organisers=\"@name @name\"",
       "You can attach an image in the same message."
     ].join("\n");
   }
   if (result.needsConfirmation) {
     return "Event parsed but needs confirmation before publishing. I saved it as draft.";
   }
+  const startDate = String(result.event?.date || result.event?.startDate || "").trim();
+  const startTime = String(result.event?.startTime || result.event?.time || "").trim() || "--:--";
+  const endDate = String(result.event?.endDate || startDate).trim();
+  const endTime = String(result.event?.endTime || "").trim() || "23:59";
+  const whenLine = startDate
+    ? (startDate === endDate
+      ? `${startDate} ${startTime}-${endTime}`
+      : `${startDate} ${startTime} -> ${endDate} ${endTime}`)
+    : `Unknown date ${startTime}-${endTime}`;
   const calendarLink = result.event?.googleCalendarPublicAddLink || result.event?.googleCalendarHtmlLink || "";
   const groupsLine = Array.isArray(groupNames) && groupNames.length > 0
     ? groupNames.join(", ")
@@ -35,6 +44,7 @@ export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = 
   return [
     "*Your event is live!*",
     `*Event:* ${result.event?.title || "Untitled event"}`,
+    `*When:* ${whenLine}`,
     `Published in *${groupsLine}* and on the *Community Live Board*.`,
     "",
     "*If you want to see the event on your calendar:*",

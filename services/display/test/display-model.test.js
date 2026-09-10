@@ -17,6 +17,10 @@ import {
 test("formatDateTime handles missing date", () => {
   assert.equal(formatDateTime("", "12:00"), "Unknown date");
   assert.equal(formatDateTime("2026-07-30", "09:30", "10:30"), "2026-07-30 09:30-10:30");
+  assert.equal(
+    formatDateTime("2026-07-30", "22:00", "01:00", "2026-07-31"),
+    "2026-07-30 22:00 -> 2026-07-31 01:00"
+  );
 });
 
 test("dayLabel returns expected labels", () => {
@@ -84,4 +88,11 @@ test("isEventLive checks date window", () => {
   const now = new Date("2026-07-15T12:00:00");
   assert.equal(isEventLive({ date: "2026-07-15", startTime: "11:00", endTime: "13:00" }, now), true);
   assert.equal(isEventLive({ date: "2026-07-15", startTime: "13:01", endTime: "15:00" }, now), false);
+  assert.equal(
+    isEventLive(
+      { date: "2026-07-15", startTime: "23:00", endDate: "2026-07-16", endTime: "01:00" },
+      new Date("2026-07-16T00:30:00")
+    ),
+    true
+  );
 });

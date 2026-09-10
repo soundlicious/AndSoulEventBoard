@@ -8,8 +8,9 @@ function eventTimestampMs(event) {
   if (!event?.date) {
     return Number.POSITIVE_INFINITY;
   }
+  const endDate = event?.endDate || event?.date;
   const endTime = event?.endTime || "23:59";
-  const date = new Date(`${event.date}T${endTime}:00`);
+  const date = new Date(`${endDate}T${endTime}:00`);
   if (Number.isNaN(date.getTime())) {
     return Number.POSITIVE_INFINITY;
   }
@@ -79,8 +80,12 @@ function sameSender(a, b) {
 export function listEvents() {
   const db = withPrunedDb();
   return db.events.sort((a, b) => {
-    const aKey = `${a.date || "9999-12-31"}T${a.startTime || "23:59"}`;
-    const bKey = `${b.date || "9999-12-31"}T${b.startTime || "23:59"}`;
+    const aDate = a.date || a.startDate || "9999-12-31";
+    const bDate = b.date || b.startDate || "9999-12-31";
+    const aTime = a.startTime || a.time || "23:59";
+    const bTime = b.startTime || b.time || "23:59";
+    const aKey = `${aDate}T${aTime}`;
+    const bKey = `${bDate}T${bTime}`;
     return aKey.localeCompare(bKey);
   });
 }
@@ -208,7 +213,7 @@ export function getEvent(id) {
   return db.events.find((item) => item.id === id);
 }
 
-export function markPublished(id, groupJid) {
+export function markPublished(id, groupJid, messageId = "") {
   const db = withPrunedDb();
   const idx = db.events.findIndex((item) => item.id === id);
   if (idx === -1) {
@@ -222,10 +227,36 @@ export function markPublished(id, groupJid) {
     ? [...previousGroups, groupJid]
     : previousGroups;
 
+  const previousMessages = Array.isArray(db.events[idx].publishedMessages)
+    ? db.events[idx].publishedMessages.filter((item) => item && typeof item === "object")
+    : [];
+  let nextMessages = previousMessages;
+  if (groupJid) {
+    const existingMessage = previousMessages.find((item) => item.groupJid === groupJid);
+    if (existingMessage) {
+      nextMessages = previousMessages.map((item) => (
+        item.groupJid === groupJid
+          ? {
+            ...item,
+            messageId: messageId || item.messageId || "",
+            publishedAt: new Date().toISOString()
+          }
+          : item
+      ));
+    } else {
+      nextMessages = [...previousMessages, {
+        groupJid,
+        messageId: messageId || "",
+        publishedAt: new Date().toISOString()
+      }];
+    }
+  }
+
   const updated = {
     ...db.events[idx],
     status: "published",
     publishedGroupJids: nextGroups,
+    publishedMessages: nextMessages,
     updatedAt: new Date().toISOString()
   };
   db.events[idx] = updated;
@@ -266,6 +297,23 @@ export function updateEvent(id, patch) {
   const updated = {
     ...db.events[idx],
     ...patch,
+    updatedAt: new Date().toISOString()
+  };
+  db.events[idx] = updated;
+  writeDb(db);
+  return updated;
+}
+
+export function setEventRepublishState(id, needsGroupRepublish) {
+  const db = withPrunedDb();
+  const idx = db.events.findIndex((item) => item.id === id);
+  if (idx === -1) {
+    return null;
+  }
+
+  const updated = {
+    ...db.events[idx],
+    needsGroupRepublish: Boolean(needsGroupRepublish),
     updatedAt: new Date().toISOString()
   };
   db.events[idx] = updated;

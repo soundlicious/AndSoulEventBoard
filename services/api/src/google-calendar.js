@@ -18,7 +18,8 @@ function isLikelyCalendarId(id) {
 
 function eventDateTime(event) {
   const start = `${event.date}T${event.startTime}:00`;
-  const end = `${event.date}T${event.endTime || "23:59"}:00`;
+  const endDate = event.endDate || event.date;
+  const end = `${endDate}T${event.endTime || "23:59"}:00`;
   return {
     start: {
       dateTime: start,

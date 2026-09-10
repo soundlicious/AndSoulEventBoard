@@ -112,8 +112,10 @@ Current parser pipeline targets these fields:
 
 - `title` (required)
 - `description` (required)
-- `date` in `YYYY-MM-DD` (required)
-- `time` in `HH:mm` (required)
+- `startDate` (or `date`) in `YYYY-MM-DD` (required)
+- `startTime` (or `time`) in `HH:mm` (required)
+- `endDate` in `YYYY-MM-DD` (optional)
+- `endTime` in `HH:mm` (optional)
 - `organisers` string array (optional but preferred)
 - `image` optional payload as URL string or attached image object `{ mimeType, dataBase64 }`
 
@@ -124,7 +126,7 @@ If `organiserMentions` mapping is provided, bot includes WhatsApp mention JIDs i
 
 The bot supports and prioritizes this DM command:
 
-`/event title="..." date="YYYY-MM-DD" time="HH:mm" desc="..." organisers="@pablo @maria"`
+`/event title="..." startDate="YYYY-MM-DD" startTime="HH:mm" endDate="YYYY-MM-DD" endTime="HH:mm" desc="..." organisers="@pablo @maria"`
 
 If the message starts with `/event`, command parsing is applied before generic parser logic.
 
@@ -132,7 +134,7 @@ For images, user should attach image media directly in WhatsApp DM (instead of s
 
 ## Time Validity Rule
 
-- API rejects events where `date + time` is not strictly in the future.
+- API rejects events where `startDate + startTime` is not strictly in the future.
 - This rule applies to both direct `POST /events` and DM ingestion `POST /ingest/dm`.
 
 ## Raspberry Pi Porting Notes

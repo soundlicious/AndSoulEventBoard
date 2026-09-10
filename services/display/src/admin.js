@@ -1,21 +1,8 @@
-const API_URL = window.__DISPLAY_CONFIG__.apiUrl;
+const API_URL = "/api";
 
 let events = [];
 let selected = new Set();
-
-function internalToken() {
-  const value = localStorage.getItem("admin_internal_token") || "";
-  return value.trim();
-}
-
-function apiHeaders() {
-  const headers = { "content-type": "application/json" };
-  const token = internalToken();
-  if (token) {
-    headers["x-internal-token"] = token;
-  }
-  return headers;
-}
+let editingId = "";
 
 function setStatus(message, isError = false) {
   const el = document.getElementById("status");
@@ -24,7 +11,9 @@ function setStatus(message, isError = false) {
 }
 
 function fmtDate(item) {
-  return `${item.date || "-"} ${item.startTime || "-"}${item.endTime ? `-${item.endTime}` : ""}`;
+  const startDate = item.date || "-";
+  const endDate = item.endDate && item.endDate !== item.date ? ` -> ${item.endDate}` : "";
+  return `${startDate}${endDate} ${item.startTime || "-"}${item.endTime ? `-${item.endTime}` : ""}`;
 }
 
 function row(item) {
@@ -37,6 +26,7 @@ function row(item) {
       <td>${fmtDate(item)}</td>
       <td>${item.status || "-"}</td>
       <td>
+        <button class="secondary single-edit" data-id="${item.id}">Edit</button>
         <button class="danger single-del" data-id="${item.id}">Delete</button>
       </td>
     </tr>
@@ -61,10 +51,7 @@ async function loadEvents() {
 }
 
 async function deleteOne(id) {
-  const res = await fetch(`${API_URL}/events/${id}`, {
-    method: "DELETE",
-    headers: apiHeaders()
-  });
+  const res = await fetch(`${API_URL}/events/${id}`, { method: "DELETE" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Delete failed (${res.status})`);
@@ -74,12 +61,69 @@ async function deleteOne(id) {
 async function deleteBatch(ids) {
   const res = await fetch(`${API_URL}/events/batch-delete`, {
     method: "POST",
-    headers: apiHeaders(),
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ ids })
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Batch delete failed (${res.status})`);
+  }
+}
+
+function findEvent(id) {
+  return events.find((item) => item.id === id) || null;
+}
+
+function parseOrganisers(value) {
+  return String(value || "")
+    .split(/[,\s]+/)
+    .map((item) => item.trim().replace(/^@+/, ""))
+    .filter((item) => item.length > 0);
+}
+
+function openEditor(item) {
+  editingId = item.id;
+  document.getElementById("edit-id").textContent = item.id;
+  document.getElementById("edit-title").value = item.title || "";
+  document.getElementById("edit-description").value = item.description || "";
+  document.getElementById("edit-date").value = item.date || "";
+  document.getElementById("edit-startTime").value = item.startTime || "";
+  document.getElementById("edit-endDate").value = item.endDate || "";
+  document.getElementById("edit-endTime").value = item.endTime || "";
+  document.getElementById("edit-organisers").value = Array.isArray(item.organisers)
+    ? item.organisers.map((name) => `@${name}`).join(" ")
+    : "";
+  document.getElementById("editor").hidden = false;
+}
+
+function closeEditor() {
+  editingId = "";
+  document.getElementById("editor").hidden = true;
+}
+
+async function saveEditor() {
+  if (!editingId) {
+    return;
+  }
+  const payload = {
+    title: document.getElementById("edit-title").value.trim(),
+    description: document.getElementById("edit-description").value.trim(),
+    date: document.getElementById("edit-date").value,
+    startTime: document.getElementById("edit-startTime").value,
+    endDate: document.getElementById("edit-endDate").value || undefined,
+    endTime: document.getElementById("edit-endTime").value || undefined,
+    organisers: parseOrganisers(document.getElementById("edit-organisers").value)
+  };
+
+  const res = await fetch(`${API_URL}/events/${editingId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const details = Array.isArray(json.errors) ? json.errors.join("; ") : (json.error || `Update failed (${res.status})`);
+    throw new Error(details);
   }
 }
 
@@ -106,6 +150,16 @@ function bind() {
     } catch (error) {
       setStatus(error.message, true);
     }
+  });
+
+  document.getElementById("rows").addEventListener("click", (event) => {
+    const target = event.target;
+    if (!target.classList.contains("single-edit")) return;
+    const id = target.dataset.id;
+    if (!id) return;
+    const item = findEvent(id);
+    if (!item) return;
+    openEditor(item);
   });
 
   document.getElementById("refresh").addEventListener("click", async () => {
@@ -144,16 +198,23 @@ function bind() {
     }
   });
 
-  document.getElementById("save-token").addEventListener("click", () => {
-    const value = document.getElementById("token").value.trim();
-    localStorage.setItem("admin_internal_token", value);
-    setStatus("Token saved in browser storage");
+  document.getElementById("save-edit").addEventListener("click", async () => {
+    try {
+      await saveEditor();
+      await loadEvents();
+      closeEditor();
+      setStatus("Event updated");
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  });
+
+  document.getElementById("cancel-edit").addEventListener("click", () => {
+    closeEditor();
   });
 }
 
 async function init() {
-  const tokenInput = document.getElementById("token");
-  tokenInput.value = internalToken();
   bind();
   try {
     await loadEvents();

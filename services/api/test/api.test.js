@@ -152,6 +152,54 @@ test("POST /ingest/dm creates event and parse log", async (t) => {
   assert.equal(mediaRes.status, 200);
 });
 
+test("POST /ingest/dm supports startDate/time/endDate aliases in /event command", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const ingestRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-aliases-1",
+      rawText: "/event title=\"Night Jam\" startDate=\"2099-01-10\" time=\"23:00\" endDate=\"2099-01-11\" endTime=\"01:30\" desc=\"late session\" organisers=\"@pablo\""
+    })
+  });
+  const ingestJson = await ingestRes.json();
+  assert.equal(ingestRes.status, 200);
+  assert.equal(ingestJson.valid, true);
+  assert.equal(ingestJson.event.date, "2099-01-10");
+  assert.equal(ingestJson.event.startTime, "23:00");
+  assert.equal(ingestJson.event.endDate, "2099-01-11");
+  assert.equal(ingestJson.event.endTime, "01:30");
+});
+
+test("POST /events rejects endDate earlier than date", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const res = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Bad range",
+      description: "Invalid end date",
+      startDate: "2099-01-10",
+      startTime: "10:00",
+      endDate: "2099-01-09",
+      endTime: "12:00"
+    })
+  });
+  const json = await res.json();
+  assert.equal(res.status, 400);
+  assert.equal(Array.isArray(json.errors), true);
+  assert.equal(json.errors.includes("endDate cannot be earlier than date"), true);
+});
+
 test("POST /ingest/dm supports cancel-event by creator only", async (t) => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));
@@ -355,6 +403,67 @@ test("POST /events/:id/publish appends published group jids", async (t) => {
   assert.equal(publishRes.status, 200);
   assert.equal(Array.isArray(published.publishedGroupJids), true);
   assert.equal(published.publishedGroupJids.includes("1203630AAAAAAAA@g.us"), true);
+  assert.equal(Array.isArray(published.publishedMessages), true);
+
+  const publishRes2 = await request(baseUrl, `/events/${created.id}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ groupJid: "1203630AAAAAAAA@g.us", messageId: "wamid.abc123" })
+  });
+  const published2 = await publishRes2.json();
+  assert.equal(publishRes2.status, 200);
+  const msg = published2.publishedMessages.find((item) => item.groupJid === "1203630AAAAAAAA@g.us");
+  assert.equal(msg.messageId, "wamid.abc123");
+});
+
+test("PATCH /events/:id updates editable fields", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const createRes = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Editable",
+      description: "Before",
+      date: "2099-01-10",
+      startTime: "10:00",
+      organisers: ["pablo"]
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 201);
+
+  const patchRes = await request(baseUrl, `/events/${created.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      title: "Edited",
+      description: "After",
+      startDate: "2099-01-11",
+      startTime: "11:30",
+      endDate: "2099-01-12",
+      endTime: "01:00",
+      organisers: ["isabel"]
+    })
+  });
+  const patched = await patchRes.json();
+  assert.equal(patchRes.status, 200);
+  assert.equal(patched.title, "Edited");
+  assert.equal(patched.description, "After");
+  assert.equal(patched.date, "2099-01-11");
+  assert.equal(patched.startTime, "11:30");
+  assert.equal(patched.endDate, "2099-01-12");
+  assert.equal(patched.endTime, "01:00");
+  assert.deepEqual(patched.organisers, ["isabel"]);
+  assert.equal(patched.needsGroupRepublish, true);
+
+  const republishDoneRes = await request(baseUrl, `/events/${created.id}/republish-done`, {
+    method: "POST"
+  });
+  const republishDone = await republishDoneRes.json();
+  assert.equal(republishDoneRes.status, 200);
+  assert.equal(republishDone.needsGroupRepublish, false);
 });
 
 test("DELETE /events/:id deletes single event", async (t) => {
@@ -621,6 +730,15 @@ test("protected routes reject missing internal token", async (t) => {
   const createJson = await createRes.json();
   assert.equal(createRes.status, 401);
   assert.equal(createJson.error, "Unauthorized");
+
+  const patchRes = await request(baseUrl, "/events/evt_fake", {
+    method: "PATCH",
+    token: "",
+    body: JSON.stringify({ title: "Nope" })
+  });
+  const patchJson = await patchRes.json();
+  assert.equal(patchRes.status, 401);
+  assert.equal(patchJson.error, "Unauthorized");
 });
 
 test("public routes remain accessible without internal token", async (t) => {

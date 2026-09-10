@@ -20,6 +20,7 @@ import {
   markPublished,
   metrics,
   removeEventRsvp,
+  setEventRepublishState,
   updateEvent
 } from "./store.js";
 import {
@@ -72,10 +73,54 @@ function isFutureEvent(date, startTime) {
   return candidate.getTime() > Date.now();
 }
 
+function eventStartDate(payload) {
+  return String(payload?.date || payload?.startDate || "").trim();
+}
+
+function eventStartTime(payload) {
+  return String(payload?.startTime || payload?.time || "").trim();
+}
+
+function eventEndDate(payload) {
+  return String(payload?.endDate || eventStartDate(payload)).trim();
+}
+
+function eventEndTime(payload) {
+  return String(payload?.endTime || "23:59").trim();
+}
+
+function normalizeEventPayload(body) {
+  const normalized = {
+    ...body,
+    date: eventStartDate(body),
+    startTime: eventStartTime(body)
+  };
+
+  const endDate = String(body?.endDate || "").trim();
+  if (endDate) {
+    normalized.endDate = endDate;
+  }
+
+  const endTime = String(body?.endTime || "").trim();
+  if (endTime) {
+    normalized.endTime = endTime;
+  }
+
+  if (normalized.time != null) {
+    delete normalized.time;
+  }
+  if (normalized.startDate != null) {
+    delete normalized.startDate;
+  }
+
+  return normalized;
+}
+
 function renderGroupMessage(event) {
   const mentionLine = Array.isArray(event.organisers) && event.organisers.length > 0
     ? `Organisers: ${event.organisers.map((name) => `@${name}`).join(" ")}`
     : "Organisers: TBD";
+  const endDate = event.endDate && event.endDate !== event.date ? ` -> ${event.endDate}` : "";
   const imageLine = typeof event.image === "string"
     ? `Image: ${event.image}`
     : event.image
@@ -85,7 +130,7 @@ function renderGroupMessage(event) {
   return [
     `*${event.title}*`,
     event.description,
-    `Date: ${event.date}`,
+    `Date: ${event.date}${endDate}`,
     `Start: ${event.startTime}`,
     `End: ${event.endTime || "23:59"}`,
     mentionLine,
@@ -99,7 +144,7 @@ function parseNewCommand(rawText) {
   }
 
   const pairs = {};
-  const matcher = /(title|date|starttime|endtime|desc|description|organisers)="([^"]*)"/gi;
+  const matcher = /(title|date|startdate|starttime|time|enddate|endtime|desc|description|organisers)="([^"]*)"/gi;
   let match = matcher.exec(rawText);
   while (match) {
     pairs[match[1].toLowerCase()] = match[2].trim();
@@ -109,15 +154,20 @@ function parseNewCommand(rawText) {
   const organisersText = pairs.organisers || "";
   const organisers = [...organisersText.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m) => m[1]);
 
-  if (!pairs.title && !pairs.date && !pairs.starttime && !pairs.desc && !pairs.description) {
+  if (!pairs.title && !pairs.date && !pairs.startdate && !pairs.starttime && !pairs.time && !pairs.desc && !pairs.description) {
     return null;
   }
+
+  const date = pairs.startdate || pairs.date || new Date().toISOString().slice(0, 10);
+  const startTime = pairs.starttime || pairs.time || "19:00";
+  const endDate = pairs.enddate || date;
 
   return {
     title: pairs.title || "Community Event",
     description: pairs.desc || pairs.description || "",
-    date: pairs.date || new Date().toISOString().slice(0, 10),
-    startTime: pairs.starttime || "19:00",
+    date,
+    startTime,
+    endDate,
     endTime: pairs.endtime || "23:59",
     organisers,
     image: null,
@@ -263,10 +313,16 @@ function isProtectedRoute(method, pathname) {
   if (method === "POST" && pathname.startsWith("/events/") && pathname.endsWith("/publish")) {
     return true;
   }
+  if (method === "POST" && pathname.startsWith("/events/") && pathname.endsWith("/republish-done")) {
+    return true;
+  }
   if (method === "POST" && pathname === "/experiments/parses") {
     return true;
   }
   if (method === "DELETE" && pathname.startsWith("/events/")) {
+    return true;
+  }
+  if (method === "PATCH" && pathname.startsWith("/events/")) {
     return true;
   }
   if (method === "POST" && pathname === "/events/batch-delete") {
@@ -410,6 +466,7 @@ function simpleParser(rawText) {
     description,
     date,
     startTime,
+    endDate: date,
     endTime: "23:59",
     organisers: organiserMentions,
     image: imageMatch ? imageMatch[0] : null,
@@ -522,7 +579,7 @@ export function createServer() {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type,x-internal-token");
 
     if (req.method === "OPTIONS") {
@@ -580,10 +637,10 @@ export function createServer() {
     if (req.method === "POST" && url.pathname === "/events") {
       try {
         const body = await parseBody(req);
-        const normalized = {
+        const normalized = normalizeEventPayload({
           ...body,
           image: persistImageIfNeeded(body.image)
-        };
+        });
         const result = validateEventPayload(normalized);
         if (result.valid && !isFutureEvent(normalized.date, normalized.startTime)) {
           result.valid = false;
@@ -606,19 +663,34 @@ export function createServer() {
     if (req.method === "POST" && url.pathname.startsWith("/events/") && url.pathname.endsWith("/publish")) {
       const id = url.pathname.split("/")[2];
       let groupJid = "";
+      let messageId = "";
       try {
         const publishBody = await parseBody(req);
         groupJid = publishBody.groupJid || "";
+        messageId = publishBody.messageId || "";
       } catch {
         groupJid = "";
+        messageId = "";
       }
       const existing = getEvent(id);
       if (!existing) {
         json(res, 404, { error: "Event not found" }, reqId);
         return;
       }
-      const updated = markPublished(id, groupJid);
+      const updated = markPublished(id, groupJid, messageId);
       cleanupOrphanMediaFiles();
+      json(res, 200, updated, reqId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname.startsWith("/events/") && url.pathname.endsWith("/republish-done")) {
+      const id = url.pathname.split("/")[2];
+      const existing = getEvent(id);
+      if (!existing) {
+        json(res, 404, { error: "Event not found" }, reqId);
+        return;
+      }
+      const updated = setEventRepublishState(id, false);
       json(res, 200, updated, reqId);
       return;
     }
@@ -641,6 +713,79 @@ export function createServer() {
         return;
       }
       json(res, 200, { deleted: true, id, calendarResult }, reqId);
+      return;
+    }
+
+    if (req.method === "PATCH" && url.pathname.startsWith("/events/")) {
+      const id = url.pathname.split("/")[2];
+      const existing = getEvent(id);
+      if (!existing) {
+        json(res, 404, { error: "Event not found" }, reqId);
+        return;
+      }
+
+      try {
+        const body = await parseBody(req);
+        const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+        const merged = {
+          ...existing,
+          ...body
+        };
+
+        if (has("startDate") && !has("date")) {
+          merged.date = String(body.startDate || "").trim();
+        }
+        if (has("date")) {
+          merged.date = String(body.date || "").trim();
+        }
+        if (has("time") && !has("startTime")) {
+          merged.startTime = String(body.time || "").trim();
+        }
+        if (has("startTime")) {
+          merged.startTime = String(body.startTime || "").trim();
+        }
+        if (has("endDate")) {
+          const nextEndDate = String(body.endDate || "").trim();
+          if (nextEndDate) {
+            merged.endDate = nextEndDate;
+          } else {
+            delete merged.endDate;
+          }
+        }
+        if (has("endTime")) {
+          const nextEndTime = String(body.endTime || "").trim();
+          if (nextEndTime) {
+            merged.endTime = nextEndTime;
+          } else {
+            delete merged.endTime;
+          }
+        }
+
+        if (Object.prototype.hasOwnProperty.call(body, "image")) {
+          merged.image = persistImageIfNeeded(body.image);
+        }
+
+        const normalized = normalizeEventPayload(merged);
+        const validation = validateEventPayload(normalized);
+        if (validation.valid && !isFutureEvent(normalized.date, normalized.startTime)) {
+          validation.valid = false;
+          validation.errors.push("Event date+startTime must be in the future");
+        }
+
+        if (!validation.valid) {
+          json(res, 400, { errors: validation.errors }, reqId);
+          return;
+        }
+
+        const updated = updateEvent(id, normalized);
+        const withRepublishState = updated
+          ? setEventRepublishState(id, true)
+          : updated;
+        cleanupOrphanMediaFiles();
+        json(res, 200, withRepublishState, reqId);
+      } catch (error) {
+        handleRouteError(res, reqId, error);
+      }
       return;
     }
 
@@ -825,6 +970,8 @@ export function createServer() {
         if (body.image) {
           parsed.image = persistImageIfNeeded(body.image);
         }
+
+        parsed = normalizeEventPayload(parsed);
 
         const confidence = computeConfidence(parsed);
         const validation = validateEventPayload(parsed);

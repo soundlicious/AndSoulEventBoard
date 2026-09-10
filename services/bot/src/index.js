@@ -33,7 +33,9 @@ const startupCutoffMs = Date.now();
 const dmObserveMode = process.env.BOT_DM_OBSERVE_MODE || "all";
 const rsvpPhoneNumber = String(process.env.BOT_RSVP_PHONE_NUMBER || "").trim();
 const processedMessageTtlMs = Number(process.env.BOT_PROCESSED_MESSAGE_TTL_MS || 5 * 60 * 1000);
+const republishPollMs = Number(process.env.BOT_REPUBLISH_POLL_MS || 15000);
 const processedMessageIds = new Map();
+let republishSyncRunning = false;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 
@@ -234,6 +236,7 @@ function renderEventMessage(event, organiserMentions) {
   const organisers = Array.isArray(event.organisers) && event.organisers.length
     ? event.organisers.map((name) => `@${name}`).join(" ")
     : "TBD";
+  const endDate = event.endDate && event.endDate !== event.date ? ` -> ${event.endDate}` : "";
 
   const mentionJids = Array.isArray(event.organisers)
     ? event.organisers
@@ -247,7 +250,7 @@ function renderEventMessage(event, organiserMentions) {
     text: [
       `*${event.title}*`,
       event.description,
-      `Date: ${event.date}`,
+      `Date: ${event.date}${endDate}`,
       `Start: ${event.startTime}`,
       `End: ${event.endTime || "23:59"}`,
       `Location: ${event.location || "CoLiving space"}`,
@@ -260,6 +263,14 @@ function renderEventMessage(event, organiserMentions) {
       rsvpLink ? `RSVP: ${rsvpLink}` : ""
     ].filter(Boolean).join("\n"),
     mentionJids
+  };
+}
+
+function renderUpdatedEventMessage(event, organiserMentions) {
+  const base = renderEventMessage(event, organiserMentions);
+  return {
+    ...base,
+    text: `[UPDATE]\n${base.text}`
   };
 }
 
@@ -329,14 +340,54 @@ async function fetchEvent(eventId) {
   return res.json();
 }
 
-async function markPublished(eventId, groupJid) {
+async function fetchEvents() {
+  const res = await fetch(`${apiBaseUrl}/events`);
+  if (!res.ok) {
+    throw new Error(`events fetch failed status=${res.status}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json.items) ? json.items : [];
+}
+
+async function markPublished(eventId, groupJid, messageId = "") {
   const publishRes = await fetch(`${apiBaseUrl}/events/${eventId}/publish`, {
     method: "POST",
     headers: apiHeaders(),
-    body: JSON.stringify({ groupJid })
+    body: JSON.stringify({ groupJid, messageId })
   });
   process.stdout.write(
-    `[${botName}] publish status=${publishRes.status} eventId=${eventId} groupJid=${groupJid}\n`
+    `[${botName}] publish status=${publishRes.status} eventId=${eventId} groupJid=${groupJid} messageId=${messageId || ""}\n`
+  );
+}
+
+async function markRepublishDone(eventId) {
+  const res = await fetch(`${apiBaseUrl}/events/${eventId}/republish-done`, {
+    method: "POST",
+    headers: apiHeaders()
+  });
+  process.stdout.write(`[${botName}] republish-done status=${res.status} eventId=${eventId}\n`);
+}
+
+async function unpublishMessage(sock, groupJid, messageId) {
+  const jid = String(groupJid || "").trim();
+  const id = String(messageId || "").trim();
+  if (!jid || !id) {
+    return;
+  }
+  try {
+    await sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe: true, id } });
+    process.stdout.write(`[${botName}] deleted previous message groupJid=${jid} messageId=${id}\n`);
+  } catch (error) {
+    process.stderr.write(`[${botName}] failed deleting previous message groupJid=${jid} messageId=${id} error=${error.message}\n`);
+  }
+}
+
+function publishedMessageMap(event) {
+  const records = Array.isArray(event?.publishedMessages) ? event.publishedMessages : [];
+  return new Map(
+    records
+      .filter((item) => item && typeof item.groupJid === "string")
+      .map((item) => [item.groupJid, String(item.messageId || "")])
   );
 }
 
@@ -458,7 +509,7 @@ async function publishViaBaileys(sock, eventId) {
 
     process.stdout.write(`[${botName}] publishing event=${eventId} to group='${group.name || "unnamed"}' jid=${groupJid}\n`);
     try {
-      await sock.sendMessage(
+      const sent = await sock.sendMessage(
         groupJid,
         imageBuffer
           ? {
@@ -474,11 +525,74 @@ async function publishViaBaileys(sock, eventId) {
           linkPreview: false
         }
       );
-      process.stdout.write(`[${botName}] baileys sent event=${eventId} groupJid=${groupJid}\n`);
-      await markPublished(eventId, groupJid);
+      const messageId = sent?.key?.id || "";
+      process.stdout.write(`[${botName}] baileys sent event=${eventId} groupJid=${groupJid} messageId=${messageId}\n`);
+      await markPublished(eventId, groupJid, messageId);
     } catch (error) {
       process.stderr.write(
         `[${botName}] publish failed event=${eventId} groupJid=${groupJid} error=${error.message || "unknown"}\n`
+      );
+    }
+  }
+}
+
+async function republishUpdatedViaBaileys(sock, eventId) {
+  const { groups, organiserMentions } = readGroupConfig();
+  const event = await fetchEvent(eventId);
+  const targetGroupJids = Array.isArray(event?.publishedGroupJids)
+    ? event.publishedGroupJids.filter((jid) => typeof jid === "string" && jid.trim().length > 0)
+    : [];
+  if (targetGroupJids.length === 0) {
+    process.stdout.write(`[${botName}] event=${eventId} has no published groups, skipping update publish\n`);
+    return;
+  }
+
+  const configuredByJid = new Map(
+    groups
+      .filter((group) => typeof group?.jid === "string" && group.jid.trim().length > 0)
+      .map((group) => [group.jid, group])
+  );
+  const previousByGroup = publishedMessageMap(event);
+  const imageBuffer = event.image
+    ? await loadImageBufferForPublish(event.image).catch((error) => {
+      process.stderr.write(`[${botName}] failed loading event image for update event=${eventId}: ${error.message}\n`);
+      return null;
+    })
+    : null;
+  const message = renderUpdatedEventMessage(event, organiserMentions);
+
+  for (const groupJid of targetGroupJids) {
+    const group = configuredByJid.get(groupJid) || { name: groupJid, jid: groupJid };
+
+    const previousMessageId = previousByGroup.get(groupJid) || "";
+    if (previousMessageId) {
+      await unpublishMessage(sock, groupJid, previousMessageId);
+    }
+
+    process.stdout.write(`[${botName}] republishing update event=${eventId} to group='${group.name || "unnamed"}' jid=${groupJid}\n`);
+    try {
+      const sent = await sock.sendMessage(
+        groupJid,
+        imageBuffer
+          ? {
+            image: imageBuffer,
+            caption: message.text,
+            mentions: message.mentionJids
+          }
+          : {
+            text: message.text,
+            mentions: message.mentionJids
+          },
+        {
+          linkPreview: false
+        }
+      );
+      const newMessageId = sent?.key?.id || "";
+      process.stdout.write(`[${botName}] baileys sent updated event=${eventId} groupJid=${groupJid} messageId=${newMessageId}\n`);
+      await markPublished(eventId, groupJid, newMessageId);
+    } catch (error) {
+      process.stderr.write(
+        `[${botName}] update publish failed event=${eventId} groupJid=${groupJid} error=${error.message || "unknown"}\n`
       );
     }
   }
@@ -501,6 +615,53 @@ async function publishViaApiOnly(eventId) {
       continue;
     }
     await markPublished(eventId, group.jid);
+  }
+}
+
+async function republishUpdatedViaApiOnly(eventId) {
+  const { organiserMentions } = readGroupConfig();
+
+  const event = await fetchEvent(eventId);
+  const targetGroupJids = Array.isArray(event?.publishedGroupJids)
+    ? event.publishedGroupJids.filter((jid) => typeof jid === "string" && jid.trim().length > 0)
+    : [];
+  if (targetGroupJids.length === 0) {
+    process.stdout.write(`[${botName}] event=${eventId} has no published groups, skipping update publish\n`);
+    return;
+  }
+  const preview = renderUpdatedEventMessage(event, organiserMentions).text.replace(/\n/g, " | ");
+  process.stdout.write(`[${botName}] update publish preview ${preview}\n`);
+
+  for (const groupJid of targetGroupJids) {
+    await markPublished(eventId, groupJid, "");
+  }
+}
+
+async function republishUpdatedToConfiguredGroups(sock, eventId) {
+  if (!enableBaileys || !sock) {
+    await republishUpdatedViaApiOnly(eventId);
+    await markRepublishDone(eventId);
+    return;
+  }
+  await republishUpdatedViaBaileys(sock, eventId);
+  await markRepublishDone(eventId);
+}
+
+async function processPendingRepublishes(sock) {
+  if (republishSyncRunning) {
+    return;
+  }
+  republishSyncRunning = true;
+  try {
+    const items = await fetchEvents();
+    const pending = items.filter((item) => item?.needsGroupRepublish === true);
+    for (const item of pending) {
+      await republishUpdatedToConfiguredGroups(sock, item.id);
+    }
+  } catch (error) {
+    process.stderr.write(`[${botName}] republish scan failed: ${error.message}\n`);
+  } finally {
+    republishSyncRunning = false;
   }
 }
 
@@ -549,7 +710,6 @@ async function startBaileysRuntime() {
       process.stderr.write(
         `[${botName}] Baileys disconnected; reason=${lastDisconnect?.error?.message || "unknown"} status=${statusCode || "n/a"}\n`
       );
-      process.stderr.write(`[${botName}] DEBUG disconnect error: ${JSON.stringify(lastDisconnect?.error?.data || lastDisconnect?.error || {})}\n`);
       if (statusCode === DisconnectReason?.loggedOut) {
         process.stderr.write(`[${botName}] session logged out from WhatsApp. Re-scan QR to restore session.\n`);
         return;
@@ -766,6 +926,14 @@ async function startBaileysRuntime() {
       }
     }
   }, 30000);
+
+  setInterval(() => {
+    processPendingRepublishes(sock).catch((error) => {
+      process.stderr.write(`[${botName}] republish loop failed: ${error.message}\n`);
+    });
+  }, republishPollMs);
+
+  await processPendingRepublishes(sock);
 }
 
 async function run() {

@@ -79,6 +79,36 @@ const adminHtml = `<!doctype html>
       border-color: #fca5a5;
       color: #7f1d1d;
     }
+    .secondary {
+      background: #e0f2fe;
+      border-color: #7dd3fc;
+      color: #075985;
+    }
+    .editor {
+      margin: 14px 0;
+      padding: 12px;
+      border: 1px solid #d7e3f3;
+      background: #fff;
+      border-radius: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .editor-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (max-width: 900px) {
+      .editor-grid { grid-template-columns: 1fr; }
+    }
+    .editor .row {
+      display: grid;
+      gap: 6px;
+    }
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -104,14 +134,49 @@ const adminHtml = `<!doctype html>
   <main class="wrap">
     <h1>Event Admin</h1>
     <div class="toolbar">
-      <input id="token" type="password" placeholder="INTERNAL_API_TOKEN" style="min-width:300px" />
-      <button id="save-token">Save token</button>
       <button id="refresh">Refresh</button>
       <button id="select-all">Select all</button>
       <button id="clear-selection">Clear selection</button>
       <button id="delete-selected" class="danger">Delete selected</button>
     </div>
     <div id="status">Loading...</div>
+    <section id="editor" class="editor" hidden>
+      <strong>Editing event: <code id="edit-id"></code></strong>
+      <div class="editor-grid">
+        <div class="row">
+          <label for="edit-title">Title</label>
+          <input id="edit-title" />
+        </div>
+        <div class="row">
+          <label for="edit-date">Start Date</label>
+          <input id="edit-date" type="date" />
+        </div>
+        <div class="row">
+          <label for="edit-startTime">Start Time</label>
+          <input id="edit-startTime" type="time" />
+        </div>
+        <div class="row">
+          <label for="edit-endDate">End Date</label>
+          <input id="edit-endDate" type="date" />
+        </div>
+        <div class="row">
+          <label for="edit-endTime">End Time</label>
+          <input id="edit-endTime" type="time" />
+        </div>
+        <div class="row">
+          <label for="edit-organisers">Organisers</label>
+          <input id="edit-organisers" placeholder="@pablo @maria" />
+        </div>
+      </div>
+      <div class="row">
+        <label for="edit-description">Description</label>
+        <textarea id="edit-description" rows="4"></textarea>
+      </div>
+      <div class="editor-actions">
+        <button id="save-edit" class="secondary">Save changes</button>
+        <button id="cancel-edit">Cancel</button>
+      </div>
+    </section>
     <table>
       <thead>
         <tr>
@@ -205,7 +270,7 @@ const createEventHtml = `<!doctype html>
 <body>
   <main class="wrap">
     <h1>Create Event</h1>
-    <p class="help">Use this form if you prefer not to use WhatsApp. Required fields: title, description, date, startTime.</p>
+    <p class="help">Use this form if you prefer not to use WhatsApp. Required fields: title, description, date, startTime. Use endDate/endTime for multi-day events.</p>
     <div class="toolbar">
       <input id="token" type="password" placeholder="INTERNAL_API_TOKEN" style="min-width:280px" />
       <button id="save-token">Save token</button>
@@ -232,6 +297,10 @@ const createEventHtml = `<!doctype html>
         <div class="row">
           <label for="endTime">End Time (optional)</label>
           <input id="endTime" name="endTime" type="time" />
+        </div>
+        <div class="row">
+          <label for="endDate">End Date (optional)</label>
+          <input id="endDate" name="endDate" type="date" />
         </div>
       </div>
       <div class="row">
@@ -311,6 +380,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/api/events") {
+    fetch(`${serverApiUrl}/events`)
+      .then(async (upstream) => {
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/api/events") {
     readRequestBody(req)
       .then(async (body) => {
@@ -348,6 +433,85 @@ const server = http.createServer((req, res) => {
         }
 
         const upstream = await fetch(`${serverApiUrl}/events`, {
+          method: "POST",
+          headers,
+          body
+        });
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
+  if (req.method === "DELETE" && req.url.startsWith("/api/events/")) {
+    const id = req.url.split("/")[3] || "";
+    const headers = {};
+    if (internalApiToken) {
+      headers["x-internal-token"] = internalApiToken;
+    }
+    fetch(`${serverApiUrl}/events/${id}`, {
+      method: "DELETE",
+      headers
+    })
+      .then(async (upstream) => {
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
+  if (req.method === "PATCH" && req.url.startsWith("/api/events/")) {
+    const id = req.url.split("/")[3] || "";
+    readRequestBody(req)
+      .then(async (body) => {
+        const headers = {
+          "content-type": "application/json"
+        };
+        if (internalApiToken) {
+          headers["x-internal-token"] = internalApiToken;
+        }
+        const upstream = await fetch(`${serverApiUrl}/events/${id}`, {
+          method: "PATCH",
+          headers,
+          body
+        });
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/events/batch-delete") {
+    readRequestBody(req)
+      .then(async (body) => {
+        const headers = {
+          "content-type": "application/json"
+        };
+        if (internalApiToken) {
+          headers["x-internal-token"] = internalApiToken;
+        }
+        const upstream = await fetch(`${serverApiUrl}/events/batch-delete`, {
           method: "POST",
           headers,
           body

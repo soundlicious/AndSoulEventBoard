@@ -25,10 +25,27 @@ test("buildAckMessage returns success text", () => {
     groupNames: ["Shoreditch &Soul Villa Events"]
   });
   assert.equal(text.includes("*Your event is live!*"), true);
+  assert.equal(text.includes("*When:*"), true);
   assert.equal(text.includes("Published in *Shoreditch &Soul Villa Events*"), true);
   assert.equal(text.includes("*If you want to see the event on your calendar:*"), true);
   assert.equal(text.includes("*If you want to see who joined:*"), true);
   assert.equal(text.includes("*If you want to delete this event:*"), true);
+});
+
+test("buildAckMessage shows multi-day date range", () => {
+  const text = buildAckMessage({
+    valid: true,
+    needsConfirmation: false,
+    event: {
+      id: "evt_321",
+      title: "Overnight Jam",
+      date: "2026-09-11",
+      startTime: "23:00",
+      endDate: "2026-09-12",
+      endTime: "01:30"
+    }
+  });
+  assert.equal(text.includes("*When:* 2026-09-11 23:00 -> 2026-09-12 01:30"), true);
 });
 
 test("buildAckMessage includes missing field details", () => {

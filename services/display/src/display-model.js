@@ -1,17 +1,24 @@
-export function formatDateTime(date, startTime, endTime) {
-  if (!date) {
+export function formatDateTime(date, startTime, endTime, endDate = "") {
+  const safeDate = String(date || "").trim();
+  const safeEndDate = String(endDate || safeDate).trim();
+  if (!safeDate) {
     return "Unknown date";
   }
   if (!startTime && !endTime) {
-    return date;
+    return safeDate === safeEndDate ? safeDate : `${safeDate} -> ${safeEndDate}`;
+  }
+  if (safeDate !== safeEndDate) {
+    const startPart = startTime ? `${safeDate} ${startTime}` : safeDate;
+    const endPart = endTime ? `${safeEndDate} ${endTime}` : safeEndDate;
+    return `${startPart} -> ${endPart}`;
   }
   if (startTime && endTime) {
-    return `${date} ${startTime}-${endTime}`;
+    return `${safeDate} ${startTime}-${endTime}`;
   }
   if (startTime) {
-    return `${date} ${startTime}`;
+    return `${safeDate} ${startTime}`;
   }
-  return `${date} until ${endTime}`;
+  return `${safeDate} until ${endTime}`;
 }
 
 export function dayLabel(dateValue, now = new Date()) {
@@ -44,7 +51,8 @@ export function isEventLive(event, now = new Date()) {
     return false;
   }
   const start = new Date(`${event.date}T${event.startTime}:00`);
-  const end = new Date(`${event.date}T${event.endTime || "23:59"}:00`);
+  const endDate = event.endDate || event.date;
+  const end = new Date(`${endDate}T${event.endTime || "23:59"}:00`);
   const nowMs = now.getTime();
   return nowMs >= start.getTime() && nowMs <= end.getTime();
 }

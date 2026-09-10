@@ -25,6 +25,7 @@ test("extractNativeEventDraft maps WhatsApp event payload", () => {
   assert.equal(draft.title, "Yoga");
   assert.equal(draft.date, "2026-08-10");
   assert.equal(draft.startTime, "10:00");
+  assert.equal(draft.endDate, "2026-08-10");
   assert.equal(draft.endTime, "11:30");
 });
 

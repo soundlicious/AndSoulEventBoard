@@ -12,8 +12,10 @@ test("validateEventPayload accepts valid payload", () => {
   const result = validateEventPayload({
     title: "Community Dinner",
     description: "Bring a dish",
-    date: "2026-07-20",
+    startDate: "2026-07-20",
     time: "19:30",
+    endDate: "2026-07-20",
+    endTime: "21:30",
     organisers: ["pablo"],
     image: {
       mimeType: "image/jpeg",
@@ -27,14 +29,16 @@ test("computeConfidence increases with optional fields", () => {
   const base = computeConfidence({
     title: "Event",
     description: "Desc",
-    date: "2026-07-20",
+    startDate: "2026-07-20",
     time: "19:30"
   });
   const boosted = computeConfidence({
     title: "Event",
     description: "Desc",
-    date: "2026-07-20",
+    startDate: "2026-07-20",
     time: "19:30",
+    endDate: "2026-07-20",
+    endTime: "21:30",
     organisers: ["pablo"],
     image: "https://example.com/flyer.jpg"
   });
