@@ -168,6 +168,10 @@ RSVP commands (via DM or click-to-chat):
 - `/CANCEL-RSVP-EVENT evt_xxxxx`
 - `/RSVPS-EVENT evt_xxxxx` (creator only)
 
+Event update command (creator only):
+
+- `/update-event evt_xxxxx title="..." startDate="YYYY-MM-DD" startTime="HH:mm" endDate="YYYY-MM-DD" endTime="HH:mm" desc="..." organisers="@name @name" location="..."`
+
 WhatsApp native Event flow:
 
 - If a user sends a native WhatsApp Event card in DM, bot stores a temporary draft.
@@ -192,6 +196,39 @@ Notes:
 - `/ingest/dm` is rate-limited (configurable via `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_PER_SENDER`, `RATE_LIMIT_MAX_GLOBAL`).
 
 When an event is created, bot acknowledgment includes both `Event ID` and `Title` so the creator can later cancel it.
+
+## Staging WhatsApp Preview Logs
+
+In staging, WhatsApp bot is disabled. To inspect what would be posted to WhatsApp groups:
+
+- API logs print `API whatsapp preview create ...` when an event is created.
+- API logs print `API whatsapp preview update ...` when an event is updated.
+- API responses for create/update also include a `whatsappPreview` field.
+- API responses for create/update also include `mockWhatsapp` with message text + click-to-chat links.
+
+You can also request a mock payload for any event directly:
+
+- `POST /mock-whatsapp/preview/:eventId` with body `{"updated": true|false}`
+
+Staging admin UI includes a **Preview Mock WhatsApp** button (enabled with `DISPLAY_MOCK_WHATSAPP_UI=true`) to render the mocked message and links directly in `/admin`.
+
+In mock UI mode, clicking a mock link does not open WhatsApp. It fills a command textarea, and you can press **Send command** to simulate the DM by calling `/ingest/dm` from the staging UI.
+
+Mock sender role selector in `/admin` lets you send the command as:
+
+- `Event creator` (uses event `createdBy` when available, fallback `DISPLAY_MOCK_SENDER_JID`)
+- `Event creator` (uses event `createdBy`, or fallback `event.source.senderJid`, then `DISPLAY_MOCK_SENDER_JID`)
+- `Guest` (uses `DISPLAY_MOCK_GUEST_SENDER_JID`)
+
+For visibility, API logs now print every `/ingest/dm` call as:
+
+- `API ingest sender=... messageId=... text='...'`
+
+Example:
+
+- `docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging logs -f api`
+
+If you do not want to connect WhatsApp in staging, keep bot disabled and use these mock previews only.
 
 ## Google Calendar Sync
 

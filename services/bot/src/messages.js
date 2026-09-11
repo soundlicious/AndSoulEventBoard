@@ -1,4 +1,4 @@
-export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = "", groupNames = [] } = {}) {
+export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = "", updateEventLink = "", groupNames = [] } = {}) {
   if (!result) {
     return "I could not process your message. Please try again.";
   }
@@ -52,6 +52,9 @@ export function buildAckMessage(result, { cancelEventLink = "", rsvpsListLink = 
     "",
     "*If you want to see who joined:*",
     rsvpsListLink || "RSVP list link not available.",
+    "",
+    "*If you want to update this event:*",
+    updateEventLink || "Update link not available.",
     "",
     "*If you want to delete this event:*",
     cancelEventLink || "Delete link not available."

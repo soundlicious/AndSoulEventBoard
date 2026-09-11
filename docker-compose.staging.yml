@@ -13,7 +13,12 @@ services:
 
   bot:
     profiles:
-      - disabled
+      - bot
+    env_file:
+      - .env.staging
+    environment:
+      - ENABLE_BAILEYS=false
+      - SIMULATE_INCOMING=false
 
   display:
     env_file:

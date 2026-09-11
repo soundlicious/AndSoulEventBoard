@@ -141,6 +141,7 @@ function shouldObserveDmMessage(msg, remoteJid) {
       || normalizedText.startsWith("/rsvp-event ")
       || normalizedText.startsWith("/cancel-rsvp-event ")
       || normalizedText.startsWith("/rsvps-event ")
+      || normalizedText.startsWith("/update-event ")
       || normalizedText.startsWith("/cancel-event ")
       || normalizedText.startsWith("/organisers ")
       || normalizedText.startsWith("/organizers ")
@@ -151,6 +152,7 @@ function shouldObserveDmMessage(msg, remoteJid) {
     || normalizedText.startsWith("/rsvp-event ")
     || normalizedText.startsWith("/cancel-rsvp-event ")
     || normalizedText.startsWith("/rsvps-event ")
+    || normalizedText.startsWith("/update-event ")
     || normalizedText.startsWith("/cancel-event ")
     || normalizedText.startsWith("/organisers ")
     || normalizedText.startsWith("/organizers ");
@@ -163,6 +165,11 @@ function shouldObserveDmMessage(msg, remoteJid) {
     return isSupportedCommand;
   }
   return startsWithCommand || (hasPendingNative && normalizedText.startsWith("/"));
+}
+
+function updateEventCommandTemplate(eventId) {
+  const id = String(eventId || "evt_xxxxx");
+  return `/update-event ${id} title="" startDate="" startTime="" endDate="" endTime="" desc="" organisers="" location=""`;
 }
 
 function shouldProcessMessageId(messageId) {
@@ -313,7 +320,8 @@ function buildClickToChatLink(commandText) {
 function creatorActionLinks(eventId) {
   return {
     cancelEventLink: buildClickToChatLink(`/cancel-event ${eventId}`),
-    rsvpsListLink: buildClickToChatLink(`/RSVPS-EVENT ${eventId}`)
+    rsvpsListLink: buildClickToChatLink(`/RSVPS-EVENT ${eventId}`),
+    updateEventLink: buildClickToChatLink(updateEventCommandTemplate(eventId))
   };
 }
 
@@ -891,6 +899,23 @@ async function startBaileysRuntime() {
         if (json.action === "rsvps_list") {
           process.stdout.write(`[${botName}] rsvps_list eventId=${json.eventId || "unknown"} ok=${Boolean(json.ok)} count=${json.count ?? 0}\n`);
           await sendText(sock, remoteJid, buildRsvpsListReply(json));
+          continue;
+        }
+
+        if (json.action === "update_event") {
+          const links = creatorActionLinks(json.eventId || json.event?.id || "");
+          if (!json.ok) {
+            await sendText(sock, remoteJid, json.message || "Update request failed");
+            continue;
+          }
+          await sendText(
+            sock,
+            remoteJid,
+            buildAckMessage(
+              { valid: true, needsConfirmation: false, event: json.event },
+              { ...links, groupNames: enabledGroupNames() }
+            )
+          );
           continue;
         }
 

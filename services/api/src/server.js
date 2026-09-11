@@ -42,6 +42,7 @@ const internalApiToken = process.env.INTERNAL_API_TOKEN || "";
 const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS || 5 * 60 * 1000);
 const rateLimitMaxPerSender = Number(process.env.RATE_LIMIT_MAX_PER_SENDER || 10);
 const rateLimitMaxGlobal = Number(process.env.RATE_LIMIT_MAX_GLOBAL || 200);
+const mockWhatsAppPhone = String(process.env.MOCK_WHATSAPP_PHONE || "447951901694").replace(/[^0-9]/g, "");
 
 const perSenderRate = new Map();
 const globalRate = [];
@@ -138,6 +139,69 @@ function renderGroupMessage(event) {
   ].filter(Boolean).join("\n");
 }
 
+function renderWhatsappPublishPreview(event, { updated = false } = {}) {
+  const organisers = Array.isArray(event?.organisers) && event.organisers.length > 0
+    ? event.organisers.map((name) => `@${name}`).join(" ")
+    : "TBD";
+  const endDate = event?.endDate && event.endDate !== event.date ? ` -> ${event.endDate}` : "";
+  const lines = [
+    updated ? "[UPDATE]" : "",
+    `*${event?.title || "Untitled Event"}*`,
+    event?.description || "",
+    `Date: ${event?.date || ""}${endDate}`,
+    `Start: ${event?.startTime || ""}`,
+    `End: ${event?.endTime || "23:59"}`,
+    `Location: ${event?.location || "CoLiving space"}`,
+    `Organisers: ${organisers}`,
+    event?.googleCalendarPublicAddLink
+      ? `Calendar: ${event.googleCalendarPublicAddLink}`
+      : event?.googleCalendarHtmlLink
+        ? `Calendar: ${event.googleCalendarHtmlLink}`
+        : ""
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+function mockClickToChat(commandText) {
+  if (!mockWhatsAppPhone) {
+    return "";
+  }
+  return `https://wa.me/${mockWhatsAppPhone}?text=${encodeURIComponent(commandText)}`;
+}
+
+function commandValue(value) {
+  return String(value == null ? "" : value)
+    .replaceAll("\n", " ")
+    .replaceAll("\r", " ")
+    .replaceAll("\"", "")
+    .trim();
+}
+
+function mockUpdateCommand(event) {
+  const eventId = String(event?.id || "");
+  const organisers = Array.isArray(event?.organisers)
+    ? event.organisers.map((name) => `@${String(name || "").replace(/^@+/, "")}`).join(" ")
+    : "";
+  return `/update-event ${eventId} title="${commandValue(event?.title)}" startDate="${commandValue(event?.date)}" startTime="${commandValue(event?.startTime)}" endDate="${commandValue(event?.endDate || event?.date)}" endTime="${commandValue(event?.endTime || "23:59")}" desc="${commandValue(event?.description)}" organisers="${commandValue(organisers)}" location="${commandValue(event?.location)}"`;
+}
+
+function mockWhatsappEnvelope(event, { updated = false } = {}) {
+  const text = renderWhatsappPublishPreview(event, { updated });
+  const eventId = String(event?.id || "");
+  return {
+    text,
+    links: {
+      rsvp: eventId ? mockClickToChat(`/RSVP-EVENT ${eventId}`) : "",
+      cancelRsvp: eventId ? mockClickToChat(`/CANCEL-RSVP-EVENT ${eventId}`) : "",
+      rsvpsList: eventId ? mockClickToChat(`/RSVPS-EVENT ${eventId}`) : "",
+      cancelEvent: eventId ? mockClickToChat(`/cancel-event ${eventId}`) : "",
+      updateEvent: eventId
+        ? mockClickToChat(mockUpdateCommand(event))
+        : ""
+    }
+  };
+}
+
 function parseNewCommand(rawText) {
   if (!rawText.trim().toLowerCase().startsWith("/event ")) {
     return null;
@@ -176,7 +240,7 @@ function parseNewCommand(rawText) {
 }
 
 function parseCancelCommand(rawText) {
-  const match = rawText.trim().match(/^\/cancel-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  const match = rawText.trim().match(/^\/cancel-event\s+(evt_[a-zA-Z0-9_-]+)/i);
   if (!match) {
     return null;
   }
@@ -184,7 +248,7 @@ function parseCancelCommand(rawText) {
 }
 
 function parseRsvpCommand(rawText) {
-  const match = rawText.trim().match(/^\/rsvp-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  const match = rawText.trim().match(/^\/rsvp-event\s+(evt_[a-zA-Z0-9_-]+)/i);
   if (!match) {
     return null;
   }
@@ -192,7 +256,7 @@ function parseRsvpCommand(rawText) {
 }
 
 function parseCancelRsvpCommand(rawText) {
-  const match = rawText.trim().match(/^\/cancel-rsvp-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  const match = rawText.trim().match(/^\/cancel-rsvp-event\s+(evt_[a-zA-Z0-9_-]+)/i);
   if (!match) {
     return null;
   }
@@ -200,11 +264,67 @@ function parseCancelRsvpCommand(rawText) {
 }
 
 function parseRsvpsListCommand(rawText) {
-  const match = rawText.trim().match(/^\/rsvps-event\s+(evt_[a-zA-Z0-9-]+)/i);
+  const match = rawText.trim().match(/^\/rsvps-event\s+(evt_[a-zA-Z0-9_-]+)/i);
   if (!match) {
     return null;
   }
   return { eventId: match[1] };
+}
+
+function parseUpdateEventCommand(rawText) {
+  const source = String(rawText || "").trim();
+  const idMatch = source.match(/^\/update-event\s+(evt_[a-zA-Z0-9_-]+)/i);
+  if (!idMatch) {
+    return null;
+  }
+
+  const pairs = {};
+  const matcher = /(title|date|startdate|starttime|time|enddate|endtime|desc|description|organisers|location)="([^"]*)"/gi;
+  let match = matcher.exec(source);
+  while (match) {
+    pairs[match[1].toLowerCase()] = match[2].trim();
+    match = matcher.exec(source);
+  }
+
+  const patch = {};
+  if (pairs.title) {
+    patch.title = pairs.title;
+  }
+  if (pairs.date || pairs.startdate) {
+    patch.date = pairs.startdate || pairs.date;
+  }
+  if (pairs.starttime || pairs.time) {
+    patch.startTime = pairs.starttime || pairs.time;
+  }
+  if (pairs.enddate) {
+    patch.endDate = pairs.enddate;
+  }
+  if (pairs.endtime) {
+    patch.endTime = pairs.endtime;
+  }
+  if (pairs.desc || pairs.description) {
+    patch.description = pairs.desc || pairs.description;
+  }
+  if (pairs.location) {
+    patch.location = pairs.location;
+  }
+  if (pairs.organisers) {
+    const organisersText = pairs.organisers;
+    const mentions = [...organisersText.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m) => m[1]);
+    const plain = organisersText
+      .split(/[\s,]+/)
+      .map((item) => item.trim().replace(/^@+/, ""))
+      .filter((item) => item.length > 0);
+    const combined = mentions.length > 0 ? mentions : plain;
+    if (combined.length > 0) {
+      patch.organisers = combined;
+    }
+  }
+
+  return {
+    eventId: idMatch[1],
+    patch
+  };
 }
 
 function json(res, statusCode, payload, reqId) {
@@ -603,6 +723,28 @@ export function createServer() {
       return;
     }
 
+    if (req.method === "POST" && url.pathname.startsWith("/mock-whatsapp/preview/")) {
+      const eventId = url.pathname.split("/")[3] || "";
+      const target = getEvent(eventId);
+      if (!target) {
+        json(res, 404, { error: "Event not found" }, reqId);
+        return;
+      }
+      let updated = false;
+      try {
+        const body = await parseBody(req);
+        updated = Boolean(body.updated);
+      } catch {
+        updated = false;
+      }
+      json(res, 200, {
+        eventId,
+        updated,
+        mockWhatsapp: mockWhatsappEnvelope(target, { updated })
+      }, reqId);
+      return;
+    }
+
     if (req.method === "GET" && url.pathname.startsWith("/media/")) {
       const fileName = url.pathname.replace("/media/", "");
       if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
@@ -652,8 +794,11 @@ export function createServer() {
         }
         const event = createEvent(normalized);
         const withCalendar = await attachGoogleCalendarData(event);
+        const whatsappPreview = renderWhatsappPublishPreview(withCalendar, { updated: false });
+        const mockWhatsapp = mockWhatsappEnvelope(withCalendar, { updated: false });
+        process.stdout.write(`API whatsapp preview create eventId=${withCalendar.id} text=${whatsappPreview.replace(/\n/g, " | ")}\n`);
         cleanupOrphanMediaFiles();
-        json(res, 201, withCalendar, reqId);
+        json(res, 201, { ...withCalendar, whatsappPreview, mockWhatsapp }, reqId);
       } catch (error) {
         handleRouteError(res, reqId, error);
       }
@@ -781,8 +926,21 @@ export function createServer() {
         const withRepublishState = updated
           ? setEventRepublishState(id, true)
           : updated;
+        const whatsappPreview = withRepublishState
+          ? renderWhatsappPublishPreview(withRepublishState, { updated: true })
+          : "";
+        const mockWhatsapp = withRepublishState
+          ? mockWhatsappEnvelope(withRepublishState, { updated: true })
+          : null;
+        if (withRepublishState) {
+          process.stdout.write(`API whatsapp preview update eventId=${withRepublishState.id} text=${whatsappPreview.replace(/\n/g, " | ")}\n`);
+        }
         cleanupOrphanMediaFiles();
-        json(res, 200, withRepublishState, reqId);
+        json(res, 200, {
+          ...withRepublishState,
+          whatsappPreview,
+          mockWhatsapp
+        }, reqId);
       } catch (error) {
         handleRouteError(res, reqId, error);
       }
@@ -823,6 +981,9 @@ export function createServer() {
           return;
         }
         const rawText = body.rawText || "";
+        process.stdout.write(
+          `API ingest sender=${senderJid} messageId=${body.messageId || "unknown"} text='${String(rawText).replace(/\s+/g, " ").slice(0, 180)}'\n`
+        );
 
         const rsvp = parseRsvpCommand(rawText);
         if (rsvp) {
@@ -947,6 +1108,85 @@ export function createServer() {
           return;
         }
 
+        const updateCommand = parseUpdateEventCommand(rawText);
+        if (updateCommand) {
+          const target = getEvent(updateCommand.eventId);
+          if (!target) {
+            json(res, 200, {
+              action: "update_event",
+              ok: false,
+              message: "Event not found",
+              eventId: updateCommand.eventId
+            }, reqId);
+            return;
+          }
+          const targetOwner = target.createdBy || target?.source?.senderJid || "";
+          if (targetOwner && !isSameActor(targetOwner, senderJid)) {
+            json(res, 200, {
+              action: "update_event",
+              ok: false,
+              message: "Only the creator can update this event",
+              eventId: updateCommand.eventId
+            }, reqId);
+            return;
+          }
+
+          if (Object.keys(updateCommand.patch).length === 0) {
+            json(res, 200, {
+              action: "update_event",
+              ok: false,
+              message: "No update fields detected. Use title/date/startTime/endDate/endTime/desc/organisers/location.",
+              eventId: updateCommand.eventId
+            }, reqId);
+            return;
+          }
+
+          const merged = normalizeEventPayload({
+            ...target,
+            ...updateCommand.patch
+          });
+          if (!targetOwner) {
+            merged.createdBy = senderJid;
+          }
+          const validation = validateEventPayload(merged);
+          if (validation.valid && !isFutureEvent(merged.date, merged.startTime)) {
+            validation.valid = false;
+            validation.errors.push("Event date+startTime must be in the future");
+          }
+          if (!validation.valid) {
+            json(res, 200, {
+              action: "update_event",
+              ok: false,
+              message: validation.errors.join("; "),
+              eventId: updateCommand.eventId,
+              errors: validation.errors
+            }, reqId);
+            return;
+          }
+
+          updateEvent(updateCommand.eventId, merged);
+          const updated = setEventRepublishState(updateCommand.eventId, true);
+          const whatsappPreview = updated
+            ? renderWhatsappPublishPreview(updated, { updated: true })
+            : "";
+          const mockWhatsapp = updated
+            ? mockWhatsappEnvelope(updated, { updated: true })
+            : null;
+          if (updated) {
+            process.stdout.write(`API whatsapp preview update eventId=${updated.id} text=${whatsappPreview.replace(/\n/g, " | ")}\n`);
+          }
+          json(res, 200, {
+            action: "update_event",
+            ok: true,
+            message: `Event ${updateCommand.eventId} updated`,
+            eventId: updateCommand.eventId,
+            event: updated,
+            whatsappPreview,
+            mockWhatsapp
+          }, reqId);
+          return;
+        }
+
         const assignmentMode = process.env.AB_ASSIGNMENT_MODE || "sender_sticky";
         const variant = assignmentForSender(senderJid, assignmentMode);
 
@@ -1030,6 +1270,8 @@ export function createServer() {
             errors: validation.errors,
             needsConfirmation,
             event,
+            whatsappPreview: event ? renderWhatsappPublishPreview(event, { updated: false }) : null,
+            mockWhatsapp: event ? mockWhatsappEnvelope(event, { updated: false }) : null,
             groupMessage: event ? renderGroupMessage(event) : null,
             parseLog
           },

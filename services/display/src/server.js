@@ -11,6 +11,9 @@ const interval = Number(process.env.CAROUSEL_INTERVAL_MS || 8000);
 const mediaBaseUrl = process.env.PUBLIC_MEDIA_URL || apiUrl;
 const maxDaysAhead = Number(process.env.DISPLAY_MAX_DAYS_AHEAD || 30);
 const displayEnableDebug = String(process.env.DISPLAY_ENABLE_DEBUG || "true") === "true";
+const displayMockWhatsappUi = String(process.env.DISPLAY_MOCK_WHATSAPP_UI || "false") === "true";
+const displayMockSenderJid = process.env.DISPLAY_MOCK_SENDER_JID || "staging-admin@s.whatsapp.net";
+const displayMockGuestSenderJid = process.env.DISPLAY_MOCK_GUEST_SENDER_JID || "staging-guest@s.whatsapp.net";
 const internalApiToken = process.env.INTERNAL_API_TOKEN || "";
 const proxyMaxBodyBytes = Number(process.env.DISPLAY_PROXY_MAX_BODY_BYTES || 8 * 1024 * 1024);
 const proxyMaxMediaBytes = Number(process.env.DISPLAY_PROXY_MAX_MEDIA_BYTES || 5 * 1024 * 1024);
@@ -84,6 +87,11 @@ const adminHtml = `<!doctype html>
       border-color: #7dd3fc;
       color: #075985;
     }
+    .mock {
+      background: #ede9fe;
+      border-color: #c4b5fd;
+      color: #4c1d95;
+    }
     .editor {
       margin: 14px 0;
       padding: 12px;
@@ -108,6 +116,66 @@ const adminHtml = `<!doctype html>
     .editor-actions {
       display: flex;
       gap: 8px;
+    }
+    .mock-preview {
+      margin: 14px 0;
+      padding: 12px;
+      border: 1px solid #d7e3f3;
+      background: #fff;
+      border-radius: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .mock-preview pre {
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 10px;
+      border-radius: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.85rem;
+    }
+    .mock-links {
+      display: grid;
+      gap: 6px;
+      font-size: 0.9rem;
+    }
+    .mock-links button {
+      text-align: left;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .mock-compose {
+      display: grid;
+      gap: 8px;
+    }
+    .mock-compose textarea {
+      min-height: 88px;
+      resize: vertical;
+      border: 1px solid #c8d6ea;
+      border-radius: 8px;
+      padding: 8px;
+      font: inherit;
+    }
+    #mock-command-result {
+      color: #0f4c81;
+      font-size: 0.9rem;
+    }
+    #mock-command-result.error {
+      color: #991b1b;
+    }
+    #mock-command-response {
+      margin: 0;
+      background: #0b1220;
+      color: #dbeafe;
+      padding: 10px;
+      border-radius: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.82rem;
     }
     table {
       width: 100%;
@@ -177,6 +245,27 @@ const adminHtml = `<!doctype html>
         <button id="cancel-edit">Cancel</button>
       </div>
     </section>
+    <section id="mock-preview" class="mock-preview" hidden>
+      <strong>Mock WhatsApp Preview</strong>
+      <div id="mock-event-id"></div>
+      <pre id="mock-text"></pre>
+      <div class="mock-links" id="mock-links"></div>
+      <div class="mock-compose">
+        <label for="mock-sender-role">Send as</label>
+        <select id="mock-sender-role">
+          <option value="creator">Event creator</option>
+          <option value="guest">Guest</option>
+        </select>
+        <div id="mock-sender-jid"></div>
+        <label for="mock-command-input">Command to send (mock DM)</label>
+        <textarea id="mock-command-input" placeholder="/update-event evt_xxxxx ..."></textarea>
+        <div class="editor-actions">
+          <button id="mock-command-send" class="mock" type="button">Send command</button>
+        </div>
+        <div id="mock-command-result"></div>
+        <pre id="mock-command-response"></pre>
+      </div>
+    </section>
     <table>
       <thead>
         <tr>
@@ -193,7 +282,10 @@ const adminHtml = `<!doctype html>
   </main>
   <script>
     window.__DISPLAY_CONFIG__ = {
-      apiUrl: ${JSON.stringify(apiUrl)}
+      apiUrl: ${JSON.stringify(apiUrl)},
+      mockWhatsappUi: ${displayMockWhatsappUi ? "true" : "false"},
+      mockSenderJid: ${JSON.stringify(displayMockSenderJid)},
+      mockGuestSenderJid: ${JSON.stringify(displayMockGuestSenderJid)}
     };
   </script>
   <script src="/admin.js"></script>
@@ -512,6 +604,61 @@ const server = http.createServer((req, res) => {
           headers["x-internal-token"] = internalApiToken;
         }
         const upstream = await fetch(`${serverApiUrl}/events/batch-delete`, {
+          method: "POST",
+          headers,
+          body
+        });
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/ingest/dm") {
+    readRequestBody(req)
+      .then(async (body) => {
+        const headers = {
+          "content-type": "application/json"
+        };
+        if (internalApiToken) {
+          headers["x-internal-token"] = internalApiToken;
+        }
+        const upstream = await fetch(`${serverApiUrl}/ingest/dm`, {
+          method: "POST",
+          headers,
+          body
+        });
+        const text = await upstream.text();
+        res.writeHead(upstream.status, {
+          "content-type": upstream.headers.get("content-type") || "application/json"
+        });
+        res.end(text);
+      })
+      .catch((error) => {
+        res.writeHead(500, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message || "Proxy error" }));
+      });
+    return;
+  }
+
+  if (req.method === "POST" && req.url.startsWith("/api/mock-whatsapp/preview/")) {
+    const eventId = req.url.split("/")[4] || "";
+    readRequestBody(req)
+      .then(async (body) => {
+        const headers = {
+          "content-type": "application/json"
+        };
+        if (internalApiToken) {
+          headers["x-internal-token"] = internalApiToken;
+        }
+        const upstream = await fetch(`${serverApiUrl}/mock-whatsapp/preview/${eventId}`, {
           method: "POST",
           headers,
           body

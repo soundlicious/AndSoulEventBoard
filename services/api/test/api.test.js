@@ -150,6 +150,10 @@ test("POST /ingest/dm creates event and parse log", async (t) => {
 
   const mediaRes = await request(baseUrl, eventJson.image, { method: "GET" });
   assert.equal(mediaRes.status, 200);
+  assert.equal(typeof ingestJson.whatsappPreview, "string");
+  assert.equal(ingestJson.whatsappPreview.includes("*Dinner*"), true);
+  assert.equal(typeof ingestJson.mockWhatsapp?.text, "string");
+  assert.equal(typeof ingestJson.mockWhatsapp?.links?.updateEvent, "string");
 });
 
 test("POST /ingest/dm supports startDate/time/endDate aliases in /event command", async (t) => {
@@ -373,6 +377,158 @@ test("POST /ingest/dm supports RSVPS-EVENT for creator only", async (t) => {
   assert.equal(unauthorizedListJson.ok, false);
 });
 
+test("POST /ingest/dm supports UPDATE-EVENT for creator only", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const when = futureDateTime(120);
+
+  const createIngest = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-update-create",
+      rawText: `/event title="Updatable" date="${when.date}" startTime="${when.startTime}" desc="before" organisers="@pablo"`
+    })
+  });
+  const created = await createIngest.json();
+  assert.equal(createIngest.status, 200);
+  assert.equal(Boolean(created.event?.id), true);
+
+  const unauthorizedRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600999999@s.whatsapp.net",
+      messageId: "MSG-update-unauth",
+      rawText: `/update-event ${created.event.id} title="Nope"`
+    })
+  });
+  const unauthorizedJson = await unauthorizedRes.json();
+  assert.equal(unauthorizedRes.status, 200);
+  assert.equal(unauthorizedJson.action, "update_event");
+  assert.equal(unauthorizedJson.ok, false);
+
+  const updateRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-update-auth",
+      rawText: `/update-event ${created.event.id} title="Updated title" desc="updated desc" endDate="2099-12-31" endTime="23:00" organisers="@isabel" location="CoWorking Room"`
+    })
+  });
+  const updateJson = await updateRes.json();
+  assert.equal(updateRes.status, 200);
+  assert.equal(updateJson.action, "update_event");
+  assert.equal(updateJson.ok, true);
+  assert.equal(updateJson.event.title, "Updated title");
+  assert.equal(updateJson.event.description, "updated desc");
+  assert.equal(updateJson.event.endDate, "2099-12-31");
+  assert.equal(updateJson.event.endTime, "23:00");
+  assert.deepEqual(updateJson.event.organisers, ["isabel"]);
+  assert.equal(updateJson.event.location, "CoWorking Room");
+  assert.equal(updateJson.event.needsGroupRepublish, true);
+  assert.equal(typeof updateJson.whatsappPreview, "string");
+  assert.equal(updateJson.whatsappPreview.startsWith("[UPDATE]"), true);
+  assert.equal(typeof updateJson.mockWhatsapp?.text, "string");
+});
+
+test("POST /ingest/dm allows update-event when createdBy is missing", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const createRes = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "No owner",
+      description: "created manually",
+      date: "2099-01-10",
+      startTime: "10:00"
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 201);
+
+  const dbPath = process.env.EVENTS_FILE_PATH;
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  const idx = db.events.findIndex((item) => item.id === created.id);
+  delete db.events[idx].createdBy;
+  if (db.events[idx].source) {
+    delete db.events[idx].source.senderJid;
+  }
+  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf8");
+
+  const updateRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-update-no-owner",
+      rawText: `/update-event ${created.id} title="Claimed owner"`
+    })
+  });
+  const updateJson = await updateRes.json();
+  assert.equal(updateRes.status, 200);
+  assert.equal(updateJson.action, "update_event");
+  assert.equal(updateJson.ok, true);
+  assert.equal(updateJson.event.createdBy, "34600111222@s.whatsapp.net");
+});
+
+test("POST /ingest/dm parses command ids with underscores", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const createRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-underscore-create",
+      rawText: "/event title=\"Stage ID\" date=\"2099-01-10\" startTime=\"10:00\" desc=\"underscore id\""
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 200);
+  assert.equal(Boolean(created.event?.id), true);
+
+  const underscoreId = created.event.id.replace(/-/g, "_");
+  const dbPath = process.env.EVENTS_FILE_PATH;
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  const idx = db.events.findIndex((item) => item.id === created.event.id);
+  db.events[idx].id = underscoreId;
+  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf8");
+
+  const rsvpRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-underscore-rsvp",
+      rawText: `/RSVP-EVENT ${underscoreId}`
+    })
+  });
+  const rsvpJson = await rsvpRes.json();
+  assert.equal(rsvpRes.status, 200);
+  assert.equal(rsvpJson.action, "rsvp");
+
+  const updateRes = await request(baseUrl, "/ingest/dm", {
+    method: "POST",
+    body: JSON.stringify({
+      senderJid: "34600111222@s.whatsapp.net",
+      messageId: "MSG-underscore-update",
+      rawText: `/update-event ${underscoreId} title="Updated"`
+    })
+  });
+  const updateJson = await updateRes.json();
+  assert.equal(updateRes.status, 200);
+  assert.equal(updateJson.action, "update_event");
+  assert.equal(updateJson.ok, true);
+});
+
 test("POST /events/:id/publish appends published group jids", async (t) => {
   const server = createServer();
   await new Promise((resolve) => server.listen(0, resolve));
@@ -457,6 +613,9 @@ test("PATCH /events/:id updates editable fields", async (t) => {
   assert.equal(patched.endTime, "01:00");
   assert.deepEqual(patched.organisers, ["isabel"]);
   assert.equal(patched.needsGroupRepublish, true);
+  assert.equal(typeof patched.whatsappPreview, "string");
+  assert.equal(patched.whatsappPreview.startsWith("[UPDATE]"), true);
+  assert.equal(typeof patched.mockWhatsapp?.links?.cancelEvent, "string");
 
   const republishDoneRes = await request(baseUrl, `/events/${created.id}/republish-done`, {
     method: "POST"
@@ -464,6 +623,44 @@ test("PATCH /events/:id updates editable fields", async (t) => {
   const republishDone = await republishDoneRes.json();
   assert.equal(republishDoneRes.status, 200);
   assert.equal(republishDone.needsGroupRepublish, false);
+});
+
+test("POST /mock-whatsapp/preview/:id returns mocked whatsapp payload", async (t) => {
+  const server = createServer();
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const createRes = await request(baseUrl, "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Mock Me",
+      description: "Preview only",
+      date: "2099-01-10",
+      startTime: "10:00",
+      organisers: ["isabel"]
+    })
+  });
+  const created = await createRes.json();
+  assert.equal(createRes.status, 201);
+
+  const previewRes = await request(baseUrl, `/mock-whatsapp/preview/${created.id}`, {
+    method: "POST",
+    headers: {},
+    body: JSON.stringify({ updated: true })
+  });
+  const preview = await previewRes.json();
+  assert.equal(previewRes.status, 200);
+  assert.equal(preview.updated, true);
+  assert.equal(preview.mockWhatsapp.text.startsWith("[UPDATE]"), true);
+  assert.equal(typeof preview.mockWhatsapp.links.rsvp, "string");
+  const updateUrl = new URL(preview.mockWhatsapp.links.updateEvent);
+  const updateText = decodeURIComponent(updateUrl.searchParams.get("text") || "");
+  assert.equal(updateText.includes(`/update-event ${created.id}`), true);
+  assert.equal(updateText.includes('title="Mock Me"'), true);
+  assert.equal(updateText.includes('desc="Preview only"'), true);
+  assert.equal(updateText.includes('organisers="@isabel"'), true);
 });
 
 test("DELETE /events/:id deletes single event", async (t) => {

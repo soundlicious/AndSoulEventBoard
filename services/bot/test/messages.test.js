@@ -22,6 +22,7 @@ test("buildAckMessage returns success text", () => {
   }, {
     cancelEventLink: "https://wa.me/34600000000?text=%2Fcancel-event%20evt_123",
     rsvpsListLink: "https://wa.me/34600000000?text=%2FRSVPS-EVENT%20evt_123",
+    updateEventLink: "https://wa.me/34600000000?text=%2Fupdate-event%20evt_123%20title%3D%22%22",
     groupNames: ["Shoreditch &Soul Villa Events"]
   });
   assert.equal(text.includes("*Your event is live!*"), true);
@@ -29,6 +30,7 @@ test("buildAckMessage returns success text", () => {
   assert.equal(text.includes("Published in *Shoreditch &Soul Villa Events*"), true);
   assert.equal(text.includes("*If you want to see the event on your calendar:*"), true);
   assert.equal(text.includes("*If you want to see who joined:*"), true);
+  assert.equal(text.includes("*If you want to update this event:*"), true);
   assert.equal(text.includes("*If you want to delete this event:*"), true);
 });
 
