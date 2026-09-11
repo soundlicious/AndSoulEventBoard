@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoLiving Events — How to use</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #111;
+    }
+
+    header {
+      background: #25d366;
+      color: white;
+      padding: 24px 20px 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 1.6rem; font-weight: 700; }
+    header p { font-size: 0.95rem; opacity: 0.9; margin-top: 6px; }
+
+    nav {
+      background: #128c7e;
+      display: flex;
+      overflow-x: auto;
+      gap: 4px;
+      padding: 0 12px;
+      scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    nav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s;
+    }
+    nav a:hover { color: white; border-bottom-color: white; }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    section { margin-bottom: 44px; }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #111;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .desc {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 16px;
+      line-height: 1.55;
+    }
+
+    /* ── WhatsApp chrome ── */
+    .chat-window {
+      background: #e5ddd5;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.15);
+    }
+    .chat-header {
+      background: #075e54;
+      color: white;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chat-header .avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: #25d366;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .chat-header .name { font-size: 0.9rem; font-weight: 600; }
+    .chat-header .sub { font-size: 0.74rem; opacity: 0.75; }
+
+    .chat-body {
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .day-label {
+      align-self: center;
+      background: rgba(255,255,255,0.65);
+      border-radius: 8px;
+      padding: 3px 12px;
+      font-size: 0.73rem;
+      color: #555;
+      margin: 2px 0 4px;
+    }
+
+    /* ── Bubbles ── */
+    .bubble {
+      max-width: 84%;
+      padding: 7px 10px 5px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      line-height: 1.45;
+      position: relative;
+      word-break: break-word;
+    }
+    .bubble.out {
+      background: #dcf8c6;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+    .bubble.in {
+      background: white;
+      align-self: flex-start;
+      border-bottom-left-radius: 2px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 3px;
+      margin-top: 2px;
+    }
+    .ts { font-size: 0.68rem; color: rgba(0,0,0,0.38); }
+    .tick { font-size: 0.7rem; color: #4fc3f7; }
+
+    /* WhatsApp event card */
+    .wa-event-card {
+      background: #f5f5f5;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .wa-event-card .card-img {
+      width: 100%;
+      height: 100px;
+      background: linear-gradient(135deg, #a8edea, #fed6e3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem;
+    }
+    .wa-event-card .card-body {
+      padding: 8px 10px 6px;
+    }
+    .wa-event-card .card-title { font-weight: 700; font-size: 0.9rem; }
+    .wa-event-card .card-meta { font-size: 0.78rem; color: #666; margin-top: 2px; }
+    .wa-event-card .card-btn {
+      display: block;
+      background: #25d366;
+      color: white;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 7px;
+      border-top: 1px solid #e0e0e0;
+      text-decoration: none;
+    }
+
+    /* Link bubble */
+    .link-pill {
+      display: inline-block;
+      color: #0f7bc4;
+      font-size: 0.82rem;
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
+    /* Bot text formatting */
+    .bot-msg { white-space: pre-line; }
+    .bot-msg strong { font-weight: 700; }
+
+    /* Tip */
+    .tip {
+      background: #fff8e1;
+      border-left: 3px solid #ffc107;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 12px;
+      line-height: 1.55;
+    }
+    .tip strong { color: #333; }
+
+    /* Input bar */
+    .input-bar {
+      background: #f0f2f5;
+      padding: 8px 10px;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      border-top: 1px solid #ddd;
+    }
+    .input-field {
+      flex: 1;
+      background: white;
+      border-radius: 22px;
+      padding: 9px 14px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: #111;
+      min-height: 38px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .input-field .prefilled { color: #111; }
+    .input-field .editable {
+      color: #075e54;
+      font-weight: 600;
+      border-bottom: 2px solid #25d366;
+      display: inline;
+    }
+    .input-field .locked { color: #888; font-size: 0.78rem; }
+    .input-field .attach-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: #c0392b;
+      font-weight: 600;
+    }
+    .send-btn {
+      width: 40px; height: 40px;
+      background: #25d366;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.1rem;
+    }
+    .annotation {
+      background: #e8f5e9;
+      border: 1.5px solid #25d366;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #1b5e20;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+    .annotation strong { color: #075e54; }
+
+    /* Step callout */
+    .steps {
+      list-style: none;
+      counter-reset: step;
+      margin: 12px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.88rem;
+      color: #333;
+      line-height: 1.5;
+    }
+    .steps li::before {
+      content: counter(step);
+      background: #25d366;
+      color: white;
+      border-radius: 50%;
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🏠 CoLiving Events</h1>
+  <p>How to create and manage community events via WhatsApp</p>
+</header>
+
+<nav>
+  <a href="#create">Create Event</a>
+  <a href="#image">Add Image</a>
+  <a href="#rsvp">RSVP</a>
+  <a href="#unrsvp">Un-RSVP</a>
+  <a href="#attendees">See Attendees</a>
+  <a href="#cancel">Cancel Event</a>
+</nav>
+
+<main>
+
+  <!-- ── CREATE EVENT ── -->
+  <section id="create">
+    <h2>📅 Create an Event</h2>
+    <p class="desc">Send a WhatsApp <strong>Event</strong> directly to the bot in a private message. The bot will announce it in the community group and publish it to the display board.</p>
+
+    <ol class="steps">
+      <li>Open a <strong>private chat with the bot</strong></li>
+      <li>Tap the <strong>+</strong> attachment icon → select <strong>Event</strong></li>
+      <li>Fill in the title, date, time and description → <strong>Send</strong></li>
+      <li>The bot will reply asking you to confirm the organisers</li>
+    </ol>
+
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+
+        <!-- Native WA event card sent by user -->
+        <div class="bubble out" style="padding:0; overflow:hidden; max-width:72%">
+          <div class="wa-event-card">
+            <div class="card-img">🎉</div>
+            <div class="card-body">
+              <div class="card-title">Summer Rooftop Party</div>
+              <div class="card-meta">📅 Sat 20 Jul · 18:00 – 23:00</div>
+              <div class="card-meta">Drinks and music on the rooftop!</div>
+            </div>
+            <span class="card-btn">View event</span>
+          </div>
+          <div class="meta-row" style="padding:0 8px 5px">
+            <span class="ts">18:32</span><span class="tick">✓✓</span>
+          </div>
+        </div>
+
+        <!-- Bot reply asking for organisers -->
+        <div class="bubble in">
+          <span class="bot-msg">To finish creating your event:
+1) Edit organiser names in the prefilled message
+2) Attach one image to that same message
+3) Press Send
+
+Do not remove tempId or quotes.
+
+Click here to continue: <span class="link-pill">https://wa.me/44700...</span></span>
+          <div class="meta-row"><span class="ts">18:32</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <strong>Next step:</strong> Tap the link the bot sent — it opens a pre-filled message. Edit the organiser names, attach an image (required) and send.
+    </div>
+  </section>
+
+  <!-- ── ADD IMAGE ── -->
+  <section id="image">
+    <h2>🖼️ Confirm Organisers &amp; Add Image</h2>
+    <p class="desc">An image is <strong>required</strong> to publish an event. Tap the link the bot sent you — it opens a pre-filled message in WhatsApp. Here's what you'll see and what to do:</p>
+
+    <ol class="steps">
+      <li>Tap the link — WhatsApp opens with a pre-filled message to the bot</li>
+      <li>Replace <code>@pablo @maria</code> with the real organiser names</li>
+      <li>Tap <strong>📎</strong> and attach a photo — the event won't publish without one</li>
+      <li>Tap send — the event goes live instantly</li>
+    </ol>
+
+    <!-- What the input looks like after tapping the link -->
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">What you'll see after tapping the link</div>
+      </div>
+      <div class="input-bar">
+        <div style="font-size:1.3rem; color:#8696a0;">📎</div>
+        <div class="input-field">
+          <div class="attach-row">📷 Tap 📎 to attach a photo — required</div>
+          <div class="prefilled">/organisers tempId="tmp_xyz", organisers="<span class="editable">@alice @bob</span>"</div>
+          <div class="locked">← edit names here, keep everything else</div>
+        </div>
+        <div class="send-btn">➤</div>
+      </div>
+    </div>
+
+    <div class="annotation">
+      <strong>✏️ Edit:</strong> Replace <code>@pablo @maria</code> with real organiser names.<br>
+      <strong>🔒 Keep:</strong> Everything else — <code>tempId</code>, quotes, the <code>/organisers</code> prefix.<br>
+      <strong>📷 Required:</strong> Attach a photo before sending or the event won't be published.
+    </div>
+
+    <!-- Result after sending — bot DM -->
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Bot confirms in your private chat</div>
+        <div class="bubble out" style="padding:0; overflow:hidden; max-width:78%">
+          <div style="background:#c8e6c9; height:80px; display:flex; align-items:center; justify-content:center; font-size:2rem;">🌇</div>
+          <div style="padding:6px 10px 0; font-size:0.8rem; font-family:monospace">/organisers tempId="tmp_xyz", organisers="@alice @bob"</div>
+          <div class="meta-row" style="padding:0 8px 5px"><span class="ts">18:35</span><span class="tick">✓✓</span></div>
+        </div>
+        <div class="bubble in">
+          <span class="bot-msg"><strong>Your event is live!</strong>
+<strong>Event:</strong> Summer Rooftop Party
+Published in <strong>CoLiving Community</strong> and on the <strong>Community Live Board</strong>.
+
+<strong>If you want to see who joined:</strong>
+<span class="link-pill">https://wa.me/44700...</span>
+
+<strong>If you want to delete this event:</strong>
+<span class="link-pill">https://wa.me/44700...</span></span>
+          <div class="meta-row"><span class="ts">18:35</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group announcement -->
+    <div style="margin-top:20px; font-size:0.88rem; font-weight:600; color:#333; margin-bottom:8px;">📢 Simultaneously announced in the community group:</div>
+    <div class="chat-window">
+      <div class="chat-header">
+        <div class="avatar">🏠</div>
+        <div>
+          <div class="name">CoLiving Community</div>
+          <div class="sub">42 members</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+        <div class="bubble in" style="max-width:92%">
+          <div style="background:#e0e0e0; height:140px; display:flex; align-items:center; justify-content:center; font-size:3rem; border-radius:6px; margin-bottom:6px;">🌇</div>
+          <span class="bot-msg"><strong>Summer Rooftop Party</strong>
+Drinks and music on the rooftop!
+Date: 2024-07-20
+Start: 18:00
+End: 23:00
+Location: CoLiving space
+Organisers: @alice @bob
+RSVP: <span class="link-pill">https://wa.me/44700...</span></span>
+          <div class="meta-row"><span class="ts">18:35</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="annotation" style="margin-top:10px">
+      <strong>👆 That RSVP link</strong> — anyone in the group can tap it to RSVP directly. It opens a pre-filled message to the bot.
+    </div>
+  </section>
+
+  <!-- ── RSVP ── -->
+  <section id="rsvp">
+    <h2>✅ RSVP to an Event</h2>
+    <p class="desc">When an event is announced in the group, the bot includes an RSVP link. Tap it to let the organisers know you're coming.</p>
+
+    <ol class="steps">
+      <li>Find the event announcement in the group chat</li>
+      <li>Tap the <strong>RSVP link</strong> in the bot's message</li>
+      <li>It opens a pre-filled message to the bot — just send it</li>
+    </ol>
+
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+
+        <div class="bubble out">
+          /RSVP-EVENT evt_abc123
+          <div class="meta-row"><span class="ts">19:10</span><span class="tick">✓✓</span></div>
+        </div>
+
+        <div class="bubble in">
+          <span class="bot-msg">RSVP confirmed.
+Event ID: evt_abc123
+RSVP Count: 5
+Cancel RSVP: <span class="link-pill">https://wa.me/44700...</span></span>
+          <div class="meta-row"><span class="ts">19:10</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── UN-RSVP ── -->
+  <section id="unrsvp">
+    <h2>↩️ Cancel your RSVP</h2>
+    <p class="desc">Changed your mind? The bot's RSVP confirmation includes a cancel link.</p>
+
+    <ol class="steps">
+      <li>Find the RSVP confirmation the bot sent you</li>
+      <li>Tap the <strong>Cancel RSVP</strong> link</li>
+      <li>Send the pre-filled message — you're removed from the list</li>
+    </ol>
+
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+
+        <div class="bubble out">
+          /CANCEL-RSVP-EVENT evt_abc123
+          <div class="meta-row"><span class="ts">20:05</span><span class="tick">✓✓</span></div>
+        </div>
+
+        <div class="bubble in">
+          <span class="bot-msg">RSVP cancelled.
+Event ID: evt_abc123
+RSVP Count: 4
+RSVP Again: <span class="link-pill">https://wa.me/44700...</span></span>
+          <div class="meta-row"><span class="ts">20:05</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SEE ATTENDEES ── -->
+  <section id="attendees">
+    <h2>👥 See who's coming</h2>
+    <p class="desc">As an organiser, the event confirmation includes a link to see the full attendee list.</p>
+
+    <ol class="steps">
+      <li>Find the <em>"Your event is live"</em> message the bot sent you</li>
+      <li>Tap <strong>If you want to see who joined</strong></li>
+      <li>Send the pre-filled message to get the list</li>
+    </ol>
+
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+
+        <div class="bubble out">
+          /RSVPS-EVENT evt_abc123
+          <div class="meta-row"><span class="ts">21:00</span><span class="tick">✓✓</span></div>
+        </div>
+
+        <div class="bubble in">
+          <span class="bot-msg">RSVP list for evt_abc123
+Total: 3
+1. Alice (+44 7700 900001)
+2. Bob (+44 7700 900002)
+3. Charlie (+44 7700 900003)</span>
+          <div class="meta-row"><span class="ts">21:00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CANCEL EVENT ── -->
+  <section id="cancel">
+    <h2>🗑️ Cancel an Event</h2>
+    <p class="desc">Only the person who created the event can cancel it. The cancel link is in the event confirmation message the bot sent you.</p>
+
+    <ol class="steps">
+      <li>Find the <em>"Your event is live"</em> message the bot sent you</li>
+      <li>Tap <strong>If you want to delete this event</strong></li>
+      <li>Send the pre-filled message — the event is removed from the board</li>
+    </ol>
+
+    <div class="chat-window" style="margin-top:16px">
+      <div class="chat-header">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="name">EventBot</div>
+          <div class="sub">private message</div>
+        </div>
+      </div>
+      <div class="chat-body">
+        <div class="day-label">Today</div>
+
+        <div class="bubble out">
+          /cancel-event evt_abc123
+          <div class="meta-row"><span class="ts">09:30</span><span class="tick">✓✓</span></div>
+        </div>
+
+        <div class="bubble in">
+          <span class="bot-msg">Cancel request processed</span>
+          <div class="meta-row"><span class="ts">09:30</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
