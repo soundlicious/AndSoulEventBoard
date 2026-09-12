@@ -217,6 +217,12 @@ Behavior:
 
 ## Carousel Display Notes
 
+- Rotation is `event 1 → calendar → event 2 → calendar → …`, including a calendar screen after the final event before looping.
+- The calendar shows Momence sessions still to start **today**, in `DISPLAY_TIMEZONE` (default `Europe/London`). Started sessions drop off automatically. Cancelled sessions remain labelled, matching the Sessions view in `andsoul-headcount`.
+- Calendar cards use the kiosk's dark teal, cream, and warm accent styling. All remaining sessions share one viewport with no scrolling, buttons, booking links, or card flips. The grid adapts its columns, rows, card orientation, and typography to the viewport and session count; secondary details disappear before time, full title, image, and attendance (`x/y attending`). Missing images/counts get explicit fallbacks.
+- `CALENDAR_INTERVAL_MS` controls the calendar dwell time (default `12000`); event dwell times retain their existing rules. `CALENDAR_REFRESH_MS` controls unattended schedule refresh (default `60000`). Calendar fetching runs independently of event rotation.
+- With no community events, the calendar stays on screen. With no remaining Momence sessions, it displays an end-of-day message. On a schedule fetch failure, it retains the last successful data, still removes started sessions, shows a connection notice, and retries automatically.
+- Open `http://localhost:3000/calendar` for the same calendar component on its own, without the carousel or event API dependency.
 - Carousel is optimized for kiosk/TV readability with large type and image panel.
 - Shows day labels (`Today`, `Tomorrow`, `In X days`) and status chip.
 - Handles API outages with offline banner while keeping last data on screen.
@@ -231,6 +237,14 @@ Behavior:
 - Debug tools:
   - Press `d` on display page to toggle a local debug overlay.
   - `GET /debug` on display service returns runtime/config diagnostics.
+
+### Momence schedule integration
+
+`GET /api/sessions` on the display server mirrors the read-only proxy in `andsoul-headcount/app/api/sessions/route.ts`; it requires no credentials. The client preserves the **Sessions** view's query contract: host `47026`, session types `course-class`, `fitness`, `retreat`, `special-event`, `special-event-new`, `fromDate` at today's midnight, page size `250`, zero-based pagination capped at four pages, and the initial 14-day range/stopping rules. It then filters the results to the remainder of today for this screen. There is no Studio-view query, booking call, or attendance write.
+
+The proxy preserves upstream response status/body and the reference cache policy (`max-age=60, s-maxage=300, stale-while-revalidate=1800`). The unattended screen adds automatic refreshing and display-timezone-aware midnight handling. The reference pagination cap is retained; events beyond the first 1,000 upstream results cannot be included. As with any fixed screen, extreme session counts require smaller text, but the grid does not silently truncate the schedule or paginate it.
+
+Implementation: `services/display/src/calendar-model.js` (queries, dates, card values, layout), `calendar.js` / `calendar.css` (screen), `momence.js` (proxy), and `rotation-model.js` (alternation and list changes). Run `npm test` for calendar query, pagination, timezone, rotation, proxy, and existing application tests.
 
 ## Admin Panel
 

@@ -9,6 +9,8 @@ import {
   resolveImageUrl,
   slideDurationMs
 } from "./display-model.js";
+import { createCalendar } from "./calendar.js";
+import { advanceRotation, reconcileRotation } from "./rotation-model.js";
 
 const config = window.__DISPLAY_CONFIG__ || {};
 const API_URL = String(config.apiUrl || "http://localhost:8080");
@@ -17,6 +19,8 @@ const DISPLAY_TIMEZONE = String(config.timezone || "Europe/London");
 const INTERVAL_MS = Number(config.intervalMs || 8000);
 const MAX_DAYS_AHEAD = Number(config.maxDaysAhead || 30);
 const ENABLE_DEBUG = Boolean(config.enableDebug);
+const CALENDAR_INTERVAL_MS = Math.max(1000, Number(config.calendarIntervalMs || 12000));
+const CALENDAR_ONLY = Boolean(config.calendarOnly);
 
 const BUFFER = 6;
 const MIN_LOOP_EVENTS = BUFFER * 2 + 1;
@@ -28,10 +32,17 @@ const mainSlide = document.getElementById("mainSlide");
 const previewTrack = document.getElementById("previewTrack");
 const debugPanel = document.getElementById("debugPanel");
 const offlineBadge = document.getElementById("offline");
+const kioskShell = document.querySelector(".kiosk-shell");
+const calendar = createCalendar({
+  element: document.getElementById("calendar"),
+  timezone: DISPLAY_TIMEZONE,
+  refreshMs: Number(config.calendarRefreshMs || 60000)
+});
 
 const state = {
   events: [],
   currentIndex: 0,
+  slideKind: "event",
   connected: true,
   lastRefreshAt: null,
   lastError: null,
@@ -96,11 +107,20 @@ function escapeHtml(value) {
 }
 
 function renderEmptyState() {
-  mainSlide.innerHTML = `<div class="empty-state">No upcoming events yet</div>`;
-  previewTrack.innerHTML = "";
+  showCalendar();
+}
+
+function showCalendar() {
+  state.slideKind = "calendar";
+  kioskShell.classList.add("is-calendar");
+  calendar.show();
+  updateDebugPanel();
 }
 
 function renderMainSlide(item, index, total, { animate = true } = {}) {
+  state.slideKind = "event";
+  kioskShell.classList.remove("is-calendar");
+  calendar.hide();
   const organisers = organisersForDisplay(item.organisers);
   const isLive = isEventLive(item);
   const label = isLive ? "Live" : dayLabel(item.date);
@@ -212,7 +232,7 @@ function updatePreviewPosition({ useTransition = true } = {}) {
     return;
   }
 
-  const loopBuffer = Math.min(state.previewBuffer || BUFFER, totalOriginals);
+  const loopBuffer = Math.min(state.previewBuffer, totalOriginals);
   const physicalIndex = state.currentIndex + loopBuffer;
   const viewport = previewTrack.parentElement;
   const viewportWidth = viewport ? viewport.offsetWidth : window.innerWidth;
@@ -250,6 +270,7 @@ function updateDebugPanel(extra = {}) {
     `<div class="debug-line">connected: ${state.connected}</div>`,
     `<div class="debug-line">events: ${state.events.length}</div>`,
     `<div class="debug-line">slideIndex: ${state.currentIndex}</div>`,
+    `<div class="debug-line">screen: ${state.slideKind}</div>`,
     `<div class="debug-line">currentTitle: ${escapeHtml(extra.currentTitle || current?.title || "-")}</div>`,
     `<div class="debug-line">lastRefreshAt: ${escapeHtml(state.lastRefreshAt || "-")}</div>`,
     `<div class="debug-line">lastError: ${escapeHtml(state.lastError || "-")}</div>`,
@@ -263,16 +284,18 @@ function updateDebugPanel(extra = {}) {
 
 async function refreshEvents() {
   try {
-    const response = await fetch(`${API_URL}/events`);
+    const response = await fetch(`${API_URL}/events`, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
-    state.events = normalizeEvents(payload.items, { maxDaysAhead: MAX_DAYS_AHEAD });
+    if (!Array.isArray(payload.items)) throw new Error("Invalid events response");
+    const nextEvents = normalizeEvents(payload.items, { maxDaysAhead: MAX_DAYS_AHEAD });
+    const cursor = reconcileRotation({ kind: state.slideKind, index: state.currentIndex }, state.events, nextEvents);
+    state.events = nextEvents;
+    state.currentIndex = cursor.index;
+    state.slideKind = cursor.kind;
     state.lastRefreshAt = new Date().toISOString();
     state.lastError = null;
     updateConnection(true);
-
-    if (state.currentIndex >= state.events.length) {
-      state.currentIndex = 0;
-    }
 
     const nextPreviewSignature = previewTrackSignature(state.events);
     if (state.previewSignature !== nextPreviewSignature) {
@@ -280,8 +303,8 @@ async function refreshEvents() {
       state.previewSignature = nextPreviewSignature;
     }
 
-    if (!state.events.length) {
-      renderEmptyState();
+    if (state.slideKind === "calendar") {
+      showCalendar();
       return;
     }
 
@@ -305,47 +328,21 @@ async function refreshEvents() {
 }
 
 function rotateNext() {
-  if (!state.events.length || state.isTransitioning) {
+  const cursor = advanceRotation({ kind: state.slideKind, index: state.currentIndex }, state.events);
+  state.slideKind = cursor.kind;
+  state.currentIndex = cursor.index;
+  if (state.slideKind === "calendar") {
+    showCalendar();
     return;
   }
-
-  state.isTransitioning = true;
-  state.currentIndex += 1;
-
-  if (state.currentIndex >= state.events.length) {
-    if (!state.previewLoopEnabled) {
-      state.currentIndex = 0;
-      renderMainSlide(state.events[state.currentIndex], state.currentIndex, state.events.length);
-      updatePreviewPosition({ useTransition: false });
-      state.isTransitioning = false;
-      return;
-    }
-
-    updatePreviewPosition({ useTransition: true });
-    setTimeout(() => {
-      state.currentIndex = 0;
-      renderMainSlide(state.events[state.currentIndex], state.currentIndex, state.events.length);
-      updatePreviewPosition({ useTransition: false });
-      state.isTransitioning = false;
-    }, TRANSITION_MS);
-    return;
-  }
-
   renderMainSlide(state.events[state.currentIndex], state.currentIndex, state.events.length);
-  updatePreviewPosition({ useTransition: true });
-
-  setTimeout(() => {
-    state.isTransitioning = false;
-  }, TRANSITION_MS);
+  updatePreviewPosition({ useTransition: false });
 }
 
 function scheduleRotation() {
-  if (!state.events.length) {
-    setTimeout(scheduleRotation, INTERVAL_MS);
-    return;
-  }
   const current = state.events[state.currentIndex];
-  const delay = slideDurationMs(current, INTERVAL_MS);
+  const delay = state.slideKind === "calendar" || !current
+    ? CALENDAR_INTERVAL_MS : slideDurationMs(current, INTERVAL_MS);
   setTimeout(() => {
     rotateNext();
     scheduleRotation();
@@ -378,11 +375,15 @@ function bindUi() {
   }
 }
 
-function bootstrap() {
+async function bootstrap() {
   bindUi();
   tickClock();
   setInterval(tickClock, 1000);
-  refreshEvents();
+  if (CALENDAR_ONLY) {
+    showCalendar();
+    return;
+  }
+  await refreshEvents();
   setInterval(refreshEvents, INTERVAL_MS);
   scheduleRotation();
 }
