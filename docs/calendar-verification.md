@@ -38,7 +38,7 @@ Browser-verified 21 live sessions at 1920×1080 and 1280×720 with no primary-te
 
 ## Pre-merge checks and configurable cadence — 2026-09-14
 
-Added `DISPLAY_EVERY_X_EVENTS` in response to Pablo's PR review comment. It defaults to `1`; positive integers count event slides across list wraparound. Invalid values fall back to `1`. It does not change calendar dwell time, refresh frequency, the empty-event fallback, or `/calendar`.
+Added `DISPLAY_CALENDAR_EVERY_X_EVENTS` in response to Pablo's PR review comment. It defaults to `1`; positive integers count event slides across list wraparound. Invalid values fall back to `1`. It does not change calendar dwell time, refresh frequency, the empty-event fallback, or `/calendar`.
 
 All 70 automated tests pass (26 API, 19 bot, 22 display, 3 shared), including configurable cadence, invalid configuration, empty-feed persistence and recovery. `git diff --check` passes.
 
