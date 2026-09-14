@@ -43,6 +43,7 @@ const state = {
   events: [],
   currentIndex: 0,
   slideKind: "event",
+  eventsSinceCalendar: 0,
   connected: true,
   lastRefreshAt: null,
   lastError: null,
@@ -112,6 +113,7 @@ function renderEmptyState() {
 
 function showCalendar() {
   state.slideKind = "calendar";
+  state.eventsSinceCalendar = 0;
   kioskShell.classList.add("is-calendar");
   calendar.show();
   updateDebugPanel();
@@ -328,7 +330,11 @@ async function refreshEvents() {
 }
 
 function rotateNext() {
-  const cursor = advanceRotation({ kind: state.slideKind, index: state.currentIndex }, state.events);
+  if (state.slideKind === "event") state.eventsSinceCalendar += 1;
+  const cursor = advanceRotation({ kind: state.slideKind, index: state.currentIndex }, state.events, {
+    every: config.calendarEveryEvents,
+    eventsShown: state.eventsSinceCalendar
+  });
   state.slideKind = cursor.kind;
   state.currentIndex = cursor.index;
   if (state.slideKind === "calendar") {

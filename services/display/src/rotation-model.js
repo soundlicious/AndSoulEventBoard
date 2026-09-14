@@ -1,6 +1,13 @@
-export function advanceRotation(current, events) {
+export function calendarFrequency(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : 1;
+}
+
+export function advanceRotation(current, events, { every = 1, eventsShown = 1 } = {}) {
   if (!events.length) return { kind: "calendar", index: -1 };
-  if (current.kind === "event") return { kind: "calendar", index: current.index };
+  if (current.kind === "event" && eventsShown >= calendarFrequency(every)) {
+    return { kind: "calendar", index: current.index };
+  }
   return { kind: "event", index: (current.index + 1) % events.length };
 }
 

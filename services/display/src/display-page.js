@@ -1,4 +1,6 @@
-export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead, enableDebug, timezone, calendarInterval = 12000, calendarRefresh = 60000, calendarOnly = false }) {
+import { calendarFrequency } from "./rotation-model.js";
+
+export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead, enableDebug, timezone, calendarInterval = 12000, calendarRefresh = 60000, calendarEveryEvents = 1, calendarOnly = false }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -41,6 +43,7 @@ export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead,
       timezone: ${JSON.stringify(timezone || "Europe/London")},
       calendarIntervalMs: ${Number.isFinite(calendarInterval) ? calendarInterval : 12000},
       calendarRefreshMs: ${Number.isFinite(calendarRefresh) ? calendarRefresh : 60000},
+      calendarEveryEvents: ${calendarFrequency(calendarEveryEvents)},
       calendarOnly: ${calendarOnly ? "true" : "false"}
     };
   </script>

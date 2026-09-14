@@ -6,7 +6,8 @@ import {
   remainingToday, sessionPrice, sessionTime, startOfDay
 } from "../src/calendar-model.js";
 import { momenceUrl, proxySessions } from "../src/momence.js";
-import { advanceRotation, reconcileRotation } from "../src/rotation-model.js";
+import { advanceRotation, calendarFrequency, reconcileRotation } from "../src/rotation-model.js";
+import { buildDisplayHtml } from "../src/display-page.js";
 
 const now = new Date("2026-09-12T10:00:00Z");
 const session = (id, startsAt = "2026-09-12T12:00:00Z") => ({ id, startsAt });
@@ -124,6 +125,45 @@ test("refresh preserves current identity and inserts calendar when visible event
   assert.deepEqual(reconciled, { kind: "calendar", index: -1 });
   assert.deepEqual(advanceRotation(reconciled, remaining), { kind: "event", index: 0 });
   assert.deepEqual(reconcileRotation({ kind: "calendar", index: -1 }, [], events), { kind: "calendar", index: -1 });
+});
+
+test("configurable calendar frequency counts event slides across wraparound", () => {
+  for (const events of [[{ id: "one" }], [{ id: "one" }, { id: "two" }]]) {
+    let cursor = { kind: "event", index: 0 };
+    let eventsShown = 0;
+    const actual = [];
+    for (let i = 0; i < 12; i += 1) {
+      actual.push(cursor.kind === "event" ? events[cursor.index].id : "calendar");
+      if (cursor.kind === "event") eventsShown += 1;
+      cursor = advanceRotation(cursor, events, { every: 3, eventsShown });
+      if (cursor.kind === "calendar") eventsShown = 0;
+    }
+    const ids = Array.from({ length: 9 }, (_, i) => events[i % events.length].id);
+    assert.deepEqual(actual, [
+      ...ids.slice(0, 3), "calendar", ...ids.slice(3, 6), "calendar", ...ids.slice(6), "calendar"
+    ]);
+  }
+});
+
+test("empty event feeds stay on calendar regardless of configured frequency", () => {
+  let cursor = { kind: "event", index: 0 };
+  for (let i = 0; i < 10; i += 1) {
+    cursor = advanceRotation(cursor, [], { every: 3, eventsShown: 0 });
+    assert.deepEqual(cursor, { kind: "calendar", index: -1 });
+  }
+  const events = [{ id: "new" }];
+  cursor = reconcileRotation(cursor, [], events);
+  assert.deepEqual(advanceRotation(cursor, events, { every: 3, eventsShown: 0 }), { kind: "event", index: 0 });
+});
+
+test("calendar frequency accepts positive integers and safely defaults invalid configuration", () => {
+  for (const invalid of [undefined, "", "bad", 0, -1, 1.5, Infinity]) {
+    assert.equal(calendarFrequency(invalid), 1);
+    assert.match(buildDisplayHtml({ calendarEveryEvents: invalid }), /calendarEveryEvents: 1,/);
+  }
+  assert.equal(calendarFrequency("3"), 3);
+  assert.match(buildDisplayHtml({ calendarEveryEvents: 3, calendarOnly: true }), /calendarEveryEvents: 3,/);
+  assert.match(buildDisplayHtml({ calendarEveryEvents: 3, calendarOnly: true }), /calendarOnly: true/);
 });
 
 test("HTTP proxy preserves upstream body/status/cache headers and handles network failures", async (t) => {

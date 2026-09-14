@@ -35,3 +35,20 @@ Live data verification used the real read-only Momence endpoint. Rotation/error 
 Removed the calendar header, date, session count, update/status banner, and branding outside the cards. The clock and debug overlay are hidden during the calendar and restored on community-event slides. Only a single loading/error/empty message remains when there are no cards to show. Cached sessions continue displaying and refreshing silently during connection failures.
 
 Browser-verified 21 live sessions at 1920×1080 and 1280×720 with no primary-text overflow or scrolling. Confirmed the event-to-calendar transition hides the clock and the calendar contains only its grid. Card fitting now also reacts to late font and image loads, which can change text geometry after the initial render.
+
+## Pre-merge checks and configurable cadence — 2026-09-14
+
+Added `DISPLAY_EVERY_X_EVENTS` in response to Pablo's PR review comment. It defaults to `1`; positive integers count event slides across list wraparound. Invalid values fall back to `1`. It does not change calendar dwell time, refresh frequency, the empty-event fallback, or `/calendar`.
+
+All 70 automated tests pass (26 API, 19 bot, 22 display, 3 shared), including configurable cadence, invalid configuration, empty-feed persistence and recovery. `git diff --check` passes.
+
+Used a separate local display server with 1.2-second event/calendar intervals, a two-second schedule refresh, and cadence `3`. Browser network fixtures changed only responses in the test browser, not stored events or the hallway deployment:
+
+- An empty community feed on `/` displayed 20 live Momence sessions continuously across ten one-second samples, repeated event refreshes and rotation ticks. The clock stayed hidden and no empty community slide appeared.
+- A failed community-event request on initial load still displayed the live Momence grid; the internal API-offline indicator was set, independently of calendar retrieval.
+- Failed Momence requests after a successful load retained the grid. A fresh load during the failure showed `Schedule unavailable. Retrying…`.
+- Empty Momence and community feeds showed only `No more sessions today.`. Restoring the live Momence route recovered the grid without reloading.
+- Adding two fixture community events to an initially empty feed resumed rotation without reloading: `calendar → A → B → A → calendar → B → A → B → calendar`.
+- `/calendar` stayed calendar-only with cadence `3` and made no community-event request. No uncaught JavaScript errors were reported.
+
+These checks model the expected behavior after the new code is installed on the hallway computer, whose currently installed version has no Momence integration. They do not verify the physical display's connectivity or deploy any code there.

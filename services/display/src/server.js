@@ -18,6 +18,7 @@ const proxyMaxMediaBytes = Number(process.env.DISPLAY_PROXY_MAX_MEDIA_BYTES || 5
 const displayTimezone = process.env.DISPLAY_TIMEZONE || process.env.TZ || "Europe/London";
 const calendarInterval = Number(process.env.CALENDAR_INTERVAL_MS || 12000);
 const calendarRefresh = Number(process.env.CALENDAR_REFRESH_MS || 60000);
+const calendarEveryEvents = Number(process.env.DISPLAY_EVERY_X_EVENTS || 1);
 const hereDir = path.dirname(fileURLToPath(import.meta.url));
 const adminJs = fs.readFileSync(path.join(hereDir, "admin.js"), "utf8");
 const createEventJs = fs.readFileSync(path.join(hereDir, "create-event.js"), "utf8");
@@ -47,7 +48,8 @@ const displayOptions = {
   enableDebug: displayEnableDebug,
   timezone: displayTimezone,
   calendarInterval,
-  calendarRefresh
+  calendarRefresh,
+  calendarEveryEvents
 };
 const html = buildDisplayHtml(displayOptions);
 const calendarHtml = buildDisplayHtml({ ...displayOptions, calendarOnly: true });
@@ -573,7 +575,8 @@ const server = http.createServer((req, res) => {
         displayEnableDebug,
         displayTimezone,
         calendarInterval,
-        calendarRefresh
+        calendarRefresh,
+        calendarEveryEvents
       }
     }));
     return;
