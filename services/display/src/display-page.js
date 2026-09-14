@@ -25,10 +25,6 @@ export function buildDisplayHtml({ apiUrl, mediaBaseUrl, interval, maxDaysAhead,
       <div id="previewTrack" class="preview-track"></div>
     </section>
     <section id="calendar" class="calendar-screen" aria-label="Today's sessions" hidden>
-      <header class="calendar-header">
-        <div><p class="calendar-eyebrow">&amp;soul · Calendar</p><h1 class="calendar-heading">The rest of <em>today.</em></h1></div>
-        <div class="calendar-summary"><div class="calendar-date"></div><div class="calendar-count"></div><div class="calendar-status" role="status"></div></div>
-      </header>
       <div class="calendar-grid"></div>
     </section>
   </main>

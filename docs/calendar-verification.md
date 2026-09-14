@@ -29,3 +29,9 @@ Additional browser checks passed:
 - Calendar cards contain no links, buttons, inputs, focus targets, or flip interactions.
 
 Live data verification used the real read-only Momence endpoint. Rotation/error scenarios used browser network fixtures, and the midnight scenario used a controlled browser clock. These checks do not establish behavior on a physical TV or deployment infrastructure.
+
+## Grid-only refinement — 2026-09-14
+
+Removed the calendar header, date, session count, update/status banner, and branding outside the cards. The clock and debug overlay are hidden during the calendar and restored on community-event slides. Only a single loading/error/empty message remains when there are no cards to show. Cached sessions continue displaying and refreshing silently during connection failures.
+
+Browser-verified 21 live sessions at 1920×1080 and 1280×720 with no primary-text overflow or scrolling. Confirmed the event-to-calendar transition hides the clock and the calendar contains only its grid. Card fitting now also reacts to late font and image loads, which can change text geometry after the initial render.

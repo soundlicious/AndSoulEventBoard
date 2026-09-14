@@ -6,8 +6,7 @@
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.5vh, 22px);
-  padding: 52px clamp(18px, 2.8vw, 64px) clamp(16px, 2.5vh, 36px);
+  padding: clamp(12px, 1.2vw, 24px);
   background: var(--bg-dark);
   overflow: hidden;
 }
@@ -15,14 +14,8 @@
 .is-calendar .carousel-container,
 .is-calendar .preview-viewport { visibility: hidden; }
 
-.calendar-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex: 0 0 auto; }
-.calendar-eyebrow { color: var(--accent-warm); text-transform: uppercase; letter-spacing: .2em; font-size: clamp(10px, 1vw, 16px); margin-bottom: 5px; }
-.calendar-heading { font-family: var(--font-editorial); font-size: clamp(26px, 3.4vw, 62px); font-weight: 400; line-height: 1.05; }
-.calendar-heading em { color: var(--accent-warm); font-weight: 400; }
-.calendar-summary { text-align: right; color: var(--text-secondary); font-size: clamp(12px, 1.2vw, 20px); line-height: 1.6; }
-.calendar-count { color: var(--accent-warm); }
-.calendar-status { font-size: clamp(10px, .85vw, 14px); opacity: .8; }
-.calendar-status.is-stale { color: var(--accent-warm); }
+.calendar-active .top-bar,
+.calendar-active .debug-panel { display: none; }
 .calendar-grid { flex: 1; min-height: 0; display: grid; width: 100%; --calendar-scale: 1; }
 
 .calendar-card {
@@ -65,20 +58,5 @@
 .calendar-grid[data-density="2"] .calendar-footer,
 .calendar-grid[data-density="2"] .calendar-teacher { display: none; }
 
-.calendar-empty { grid-column: 1 / -1; grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 18px; color: var(--text-secondary); }
-.calendar-empty-mark { color: var(--accent-warm); font-family: var(--font-editorial); font-size: 40px; }
-.calendar-empty h2 { color: var(--text-primary); font-family: var(--font-editorial); font-size: clamp(24px, 3vw, 48px); font-weight: 400; }
+.calendar-empty { grid-column: 1 / -1; grid-row: 1 / -1; display: grid; place-items: center; text-align: center; color: var(--text-secondary); }
 .calendar-empty p { font-size: clamp(14px, 1.5vw, 22px); }
-
-@media (max-height: 540px) {
-  .calendar-screen { padding-top: 38px; gap: 10px; }
-  .calendar-heading { font-size: 28px; }
-  .calendar-eyebrow, .calendar-status { display: none; }
-}
-
-@media (max-width: 600px) {
-  .calendar-screen { padding-inline: 14px; }
-  .calendar-header { align-items: flex-start; gap: 10px; }
-  .calendar-summary { font-size: 11px; }
-  .calendar-date { max-width: 130px; }
-}

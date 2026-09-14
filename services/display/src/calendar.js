@@ -42,14 +42,10 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
   let loaded = false;
   let failed = false;
   let refreshing = false;
-  let lastUpdated = null;
   let lastDay = dayKey(new Date(), timezone);
   let signature = "";
   let frame = null;
   const grid = element.querySelector(".calendar-grid");
-  const status = element.querySelector(".calendar-status");
-  const date = element.querySelector(".calendar-date");
-  const count = element.querySelector(".calendar-count");
 
   function fit() {
     if (element.hidden || !grid.children.length || grid.querySelector(".calendar-empty")) return;
@@ -89,26 +85,21 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
   function render() {
     const now = new Date();
     const items = remainingToday(sessions, now, timezone);
-    date.textContent = now.toLocaleDateString("en-GB", { timeZone: timezone, weekday: "long", day: "numeric", month: "long" });
-    count.textContent = `${items.length} ${items.length === 1 ? "session" : "sessions"} remaining`;
-    status.textContent = failed
-      ? loaded ? "Connection interrupted · showing last update" : "Schedule unavailable · retrying automatically"
-      : !loaded ? "Loading today's sessions…"
-        : `Updated ${lastUpdated.toLocaleTimeString("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit" })}`;
-    status.classList.toggle("is-stale", failed);
     const nextSignature = JSON.stringify([items, loaded, failed && !loaded]);
     if (signature !== nextSignature) {
       signature = nextSignature;
       grid.style.gridTemplateColumns = "";
       grid.style.gridTemplateRows = "";
       grid.innerHTML = items.length ? items.map((session) => cardHtml(session, timezone)).join("")
-        : `<div class="calendar-empty"><span class="calendar-empty-mark">&amp;soul</span><h2>${!loaded ? failed ? "We'll be back shortly" : "Getting today ready" : "That's everything for today"}</h2><p>${!loaded ? failed ? "The schedule will return when the connection is restored." : "Loading the day's remaining sessions…" : "There are no more sessions starting today."}</p></div>`;
+        : `<div class="calendar-empty" role="status"><p>${!loaded ? failed ? "Schedule unavailable. Retrying…" : "Loading sessions…" : "No more sessions today."}</p></div>`;
       grid.querySelectorAll("img").forEach((img) => {
+        img.addEventListener("load", scheduleFit, { once: true });
         img.addEventListener("error", () => {
           img.hidden = true;
           if (img.parentElement.classList.contains("calendar-image")) {
             img.parentElement.insertAdjacentHTML("beforeend", '<span class="calendar-image-placeholder">&amp;soul</span>');
           }
+          scheduleFit();
         }, { once: true });
       });
       scheduleFit();
@@ -122,7 +113,6 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
       sessions = await fetchBookingSessions({ timezone });
       loaded = true;
       failed = false;
-      lastUpdated = new Date();
     } catch {
       failed = true;
     } finally {
@@ -133,6 +123,7 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
 
   function show() {
     element.hidden = false;
+    document.body.classList.add("calendar-active");
     render();
     scheduleFit();
   }
@@ -140,6 +131,7 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
   const observer = new ResizeObserver(scheduleFit);
   observer.observe(grid);
   document.fonts?.ready.then(scheduleFit);
+  document.fonts?.addEventListener("loadingdone", scheduleFit);
   render();
   refresh();
   setInterval(refresh, Math.max(1000, refreshMs));
@@ -153,5 +145,12 @@ export function createCalendar({ element, timezone = "Europe/London", refreshMs 
     render();
   }, 1000);
 
-  return { show, hide: () => { element.hidden = true; }, fit: scheduleFit };
+  return {
+    show,
+    hide: () => {
+      element.hidden = true;
+      document.body.classList.remove("calendar-active");
+    },
+    fit: scheduleFit
+  };
 }
