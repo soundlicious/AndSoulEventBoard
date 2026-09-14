@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDisplayHtml } from "./display-page.js";
+import { proxySessions } from "./momence.js";
 
 const displayPort = Number(process.env.DISPLAY_PORT || 3000);
 const apiUrl = process.env.PUBLIC_API_URL || "http://localhost:8080";
@@ -15,12 +16,18 @@ const internalApiToken = process.env.INTERNAL_API_TOKEN || "";
 const proxyMaxBodyBytes = Number(process.env.DISPLAY_PROXY_MAX_BODY_BYTES || 8 * 1024 * 1024);
 const proxyMaxMediaBytes = Number(process.env.DISPLAY_PROXY_MAX_MEDIA_BYTES || 5 * 1024 * 1024);
 const displayTimezone = process.env.DISPLAY_TIMEZONE || process.env.TZ || "Europe/London";
+const calendarInterval = Number(process.env.CALENDAR_INTERVAL_MS || 12000);
+const calendarRefresh = Number(process.env.CALENDAR_REFRESH_MS || 60000);
+const calendarEveryEvents = Number(process.env.DISPLAY_EVERY_X_EVENTS || 1);
 const hereDir = path.dirname(fileURLToPath(import.meta.url));
 const adminJs = fs.readFileSync(path.join(hereDir, "admin.js"), "utf8");
 const createEventJs = fs.readFileSync(path.join(hereDir, "create-event.js"), "utf8");
 const displayJs = fs.readFileSync(path.join(hereDir, "display.js"), "utf8");
 const displayModelJs = fs.readFileSync(path.join(hereDir, "display-model.js"), "utf8");
 const displayCss = fs.readFileSync(path.join(hereDir, "display.css"), "utf8");
+const calendarAssets = new Map(["calendar.js", "calendar-model.js", "rotation-model.js", "calendar.css"].map((file) => [
+  `/${file}`, fs.readFileSync(path.join(hereDir, file), "utf8")
+]));
 
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
@@ -33,14 +40,19 @@ function readRequestBody(req) {
   });
 }
 
-const html = buildDisplayHtml({
+const displayOptions = {
   apiUrl,
   mediaBaseUrl,
   interval,
   maxDaysAhead,
   enableDebug: displayEnableDebug,
-  timezone: displayTimezone
-});
+  timezone: displayTimezone,
+  calendarInterval,
+  calendarRefresh,
+  calendarEveryEvents
+};
+const html = buildDisplayHtml(displayOptions);
+const calendarHtml = buildDisplayHtml({ ...displayOptions, calendarOnly: true });
 
 const adminHtml = `<!doctype html>
 <html lang="en">
@@ -326,6 +338,23 @@ const createEventHtml = `<!doctype html>
 </html>`;
 
 const server = http.createServer((req, res) => {
+  const url = new URL(req.url, "http://display.local");
+  if (req.method === "GET" && url.pathname === "/api/sessions") {
+    void proxySessions(url.searchParams, res);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/calendar") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(calendarHtml);
+    return;
+  }
+
+  if (req.method === "GET" && calendarAssets.has(url.pathname)) {
+    res.writeHead(200, { "content-type": url.pathname.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8" });
+    res.end(calendarAssets.get(url.pathname));
+    return;
+  }
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true, service: "display" }));
@@ -544,7 +573,10 @@ const server = http.createServer((req, res) => {
         interval,
         maxDaysAhead,
         displayEnableDebug,
-        displayTimezone
+        displayTimezone,
+        calendarInterval,
+        calendarRefresh,
+        calendarEveryEvents
       }
     }));
     return;
