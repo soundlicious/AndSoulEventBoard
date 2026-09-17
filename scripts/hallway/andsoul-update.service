@@ -1,0 +1,16 @@
+[Unit]
+Description=Update the AndSoul hallway app to tested main
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/andsoul-updater/updater.py update
+UMask=0077
+TimeoutStartSec=75min
+Nice=10
+IOSchedulingClass=idle
+# On timeout give Python's child processes time to stop; next run restores pending deployment.
+KillMode=control-group
+

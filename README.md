@@ -67,6 +67,8 @@ npm run staging:down
 
 ## Current Scope
 
+For the Ubuntu hallway computer's one-time automatic-update setup, see [Hallway automatic updates](docs/hallway-auto-update.md). It reuses the existing Docker Compose installation, deploys only CI-passing `main` commits, and supports health-gated rollback without registry credentials.
+
 - `api` provides event ingestion, event listing, publish endpoint, and parser experiment metrics.
 - `bot` is currently a Baileys-ready scaffold that simulates inbound DM payloads.
 - `display` is a kiosk-friendly carousel page that polls the API.
