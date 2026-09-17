@@ -93,4 +93,6 @@ Keep the existing `main` review discipline: anyone allowed to push application/D
 
 The `/version` endpoint reports the display build ID and whether the host updater has approved that version. It contains no secrets. Only `/` and `/calendar` auto-refresh; editing/admin forms do not.
 
+On 2026-09-17, GitHub-hosted Ubuntu tests exercised the real Docker and systemd installer paths, not just mocks. A local browser check against the actual display server also confirmed: an unapproved new version caused no reload; approving it caused exactly one reload after two checks; the calendar rendered again afterward. Browser observations were advanced by directly invoking the same polling function (the production interval remains 30 seconds). The physical hallway machine and its desktop reboot behavior have not been tested here.
+
 References: [Compose health-gated startup](https://docs.docker.com/reference/cli/docker/compose/up/), [GitHub workflow-run API](https://docs.github.com/en/rest/actions/workflow-runs).

@@ -66,12 +66,14 @@ def snapshot(manifest, containers, project):
                 actual = next((m for m in info["Mounts"] if m["Destination"] == mount["target"]), None)
                 if not actual or actual["Type"] != "bind" or actual["Source"] != mount["source"]:
                     raise RuntimeError("Live bind mounts differ from Compose configuration; reconcile them before installing")
+                mount["read_only"] = not actual.get("RW", True)
             if mount.get("type") == "volume":
                 actual = next((m for m in info["Mounts"] if m["Destination"] == mount["target"]), None)
                 if not actual or actual["Type"] != "volume" or not mount.get("source"):
                     raise RuntimeError("Anonymous or missing volumes require manual migration")
                 # Explicit external names prevent creation of an empty replacement volume.
                 result.setdefault("volumes", {})[mount["source"]] = {"external": True, "name": actual["Name"]}
+                mount["read_only"] = not actual.get("RW", True)
         # Preserve the existing networks rather than attempting to recreate them.
         for key in cfg.get("networks", {}):
             network = result.get("networks", {}).get(key, {})
@@ -127,6 +129,9 @@ def install(project=None):
     os.chmod(STATE, 0o700)
     with open(STATE / "lock", "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        current_ids = run(["docker", "ps", "-q", "--no-trunc", "--filter", f"label=com.docker.compose.project={project}"]).splitlines()
+        if set(current_ids) != {c["Id"] for c in containers.values()}:
+            raise RuntimeError("Containers changed during preflight; re-run the installer to adopt their current state")
         repo = STATE / "repo.git"
         if not repo.exists():
             run(["git", "init", "--bare", repo])
