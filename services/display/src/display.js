@@ -11,6 +11,7 @@ import {
 } from "./display-model.js";
 import { createCalendar } from "./calendar.js";
 import { advanceRotation, reconcileRotation } from "./rotation-model.js";
+import { createUpdateCheck } from "./update-check.js";
 
 const config = window.__DISPLAY_CONFIG__ || {};
 const API_URL = String(config.apiUrl || "http://localhost:8080");
@@ -382,6 +383,7 @@ function bindUi() {
 }
 
 async function bootstrap() {
+  setInterval(createUpdateCheck({ version: config.buildId }), 30000);
   bindUi();
   tickClock();
   setInterval(tickClock, 1000);

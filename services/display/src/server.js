@@ -19,13 +19,15 @@ const displayTimezone = process.env.DISPLAY_TIMEZONE || process.env.TZ || "Europ
 const calendarInterval = Number(process.env.CALENDAR_INTERVAL_MS || 12000);
 const calendarRefresh = Number(process.env.CALENDAR_REFRESH_MS || 60000);
 const calendarEveryEvents = Number(process.env.DISPLAY_CALENDAR_EVERY_X_EVENTS || 1);
+const buildId = process.env.DISPLAY_BUILD_ID || "";
+const deploymentStateFile = process.env.DEPLOYMENT_STATE_FILE || "";
 const hereDir = path.dirname(fileURLToPath(import.meta.url));
 const adminJs = fs.readFileSync(path.join(hereDir, "admin.js"), "utf8");
 const createEventJs = fs.readFileSync(path.join(hereDir, "create-event.js"), "utf8");
 const displayJs = fs.readFileSync(path.join(hereDir, "display.js"), "utf8");
 const displayModelJs = fs.readFileSync(path.join(hereDir, "display-model.js"), "utf8");
 const displayCss = fs.readFileSync(path.join(hereDir, "display.css"), "utf8");
-const calendarAssets = new Map(["calendar.js", "calendar-model.js", "rotation-model.js", "calendar.css"].map((file) => [
+const calendarAssets = new Map(["calendar.js", "calendar-model.js", "rotation-model.js", "calendar.css", "update-check.js"].map((file) => [
   `/${file}`, fs.readFileSync(path.join(hereDir, file), "utf8")
 ]));
 
@@ -49,7 +51,8 @@ const displayOptions = {
   timezone: displayTimezone,
   calendarInterval,
   calendarRefresh,
-  calendarEveryEvents
+  calendarEveryEvents,
+  buildId
 };
 const html = buildDisplayHtml(displayOptions);
 const calendarHtml = buildDisplayHtml({ ...displayOptions, calendarOnly: true });
@@ -338,7 +341,19 @@ const createEventHtml = `<!doctype html>
 </html>`;
 
 const server = http.createServer((req, res) => {
+  // Kiosk reloads must fetch a coherent, current set of HTML and modules.
+  res.setHeader("cache-control", "no-store");
   const url = new URL(req.url, "http://display.local");
+  if (req.method === "GET" && url.pathname === "/version") {
+    let ready = !deploymentStateFile;
+    if (deploymentStateFile) {
+      try { ready = JSON.parse(fs.readFileSync(deploymentStateFile, "utf8")).version === buildId; }
+      catch { ready = false; }
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ version: buildId, ready }));
+    return;
+  }
   if (req.method === "GET" && url.pathname === "/api/sessions") {
     void proxySessions(url.searchParams, res);
     return;
