@@ -86,7 +86,7 @@ def main():
             if os.environ.get("GITHUB_ACTIONS") == "true":
                 # Exercise the exact one-command installer on the disposable Ubuntu runner.
                 assert not Path("/var/lib/andsoul-updater/config.json").exists()
-                run(["sudo", "python3", "scripts/hallway/install.py", "--project", project], cwd=checkout)
+                run(["sudo", "python3", "scripts/hallway/install.py"], cwd=checkout)
                 status = json.loads(run(["sudo", "python3", "/opt/andsoul-updater/updater.py", "status"]))
                 assert status["project"] == project
                 assert run(["systemctl", "is-enabled", "andsoul-update.timer"]) == "enabled"

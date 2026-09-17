@@ -46,10 +46,26 @@ def snapshot(manifest, containers, project):
             cfg.pop(key, None)
         cfg["environment"] = dict(item.split("=", 1) for item in info["Config"]["Env"])
         cfg["image"] = info["Image"]
+        # Use actual bindings, not newly edited .env port values from an un-recreated app.
+        bindings = info.get("HostConfig", {}).get("PortBindings")
+        if bindings is not None:
+            cfg["ports"] = []
+            for target, hosts in bindings.items():
+                port, protocol = target.split("/")
+                for host in hosts or []:
+                    if host["HostPort"] in ("", "0"):
+                        raise RuntimeError("Randomly assigned production ports need an explicit Compose port first")
+                    entry = {"target": int(port), "published": host["HostPort"], "protocol": protocol}
+                    if host.get("HostIp"):
+                        entry["host_ip"] = host["HostIp"]
+                    cfg["ports"].append(entry)
         for mount in cfg.get("volumes", []):
             if mount.get("type") == "bind":
                 if not Path(mount["source"]).is_absolute() or not Path(mount["source"]).exists():
                     raise RuntimeError("A bind mount is missing or not absolute; refusing adoption")
+                actual = next((m for m in info["Mounts"] if m["Destination"] == mount["target"]), None)
+                if not actual or actual["Type"] != "bind" or actual["Source"] != mount["source"]:
+                    raise RuntimeError("Live bind mounts differ from Compose configuration; reconcile them before installing")
             if mount.get("type") == "volume":
                 actual = next((m for m in info["Mounts"] if m["Destination"] == mount["target"]), None)
                 if not actual or actual["Type"] != "volume" or not mount.get("source"):

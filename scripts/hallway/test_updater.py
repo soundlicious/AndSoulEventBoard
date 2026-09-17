@@ -147,6 +147,14 @@ class AdoptionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "healthcheck"):
             validate_live(cfg, infos)
 
+    def test_adoption_preserves_live_ports_not_new_env_values(self):
+        cfg, infos = self.fixture()
+        cfg["services"]["display"]["ports"] = [{"target": 3000, "published": "9999"}]
+        infos["display"]["HostConfig"] = {"PortBindings": {"3000/tcp": [{"HostPort": "3000", "HostIp": "127.0.0.1"}]}}
+        result = snapshot(cfg, infos, "project")
+        self.assertEqual(result["services"]["display"]["ports"],
+                         [{"target": 3000, "published": "3000", "protocol": "tcp", "host_ip": "127.0.0.1"}])
+
 
 if __name__ == "__main__":
     unittest.main()
