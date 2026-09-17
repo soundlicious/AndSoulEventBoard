@@ -246,6 +246,13 @@ def main():
     if os.geteuid() != 0:
         parser.error("Run with sudo")
     os.umask(0o077)
+    if args.command == "status":
+        # State files are atomically replaced; inspection need not wait for a long build.
+        updater = Updater()
+        print(json.dumps({"project": updater.config["project"], "services": updater.config["services"],
+                          **{k: updater.state.get(k) for k in ("paused", "pending", "failed", "last_success")},
+                          "installed_commit": updater.state["active"]["sha"]}, indent=2))
+        return
     with open(STATE / "lock", "a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -253,11 +260,7 @@ def main():
             log("Another updater/installer is running; try again later")
             return
         updater = Updater()
-        if args.command == "status":
-            print(json.dumps({"project": updater.config["project"], "services": updater.config["services"],
-                              **{k: updater.state.get(k) for k in ("paused", "pending", "failed", "last_success")},
-                              "installed_commit": updater.state["active"]["sha"]}, indent=2))
-        elif args.command in ("pause", "resume"):
+        if args.command in ("pause", "resume"):
             updater.state["paused"] = args.command == "pause"
             updater.save()
             log("Paused" if updater.state["paused"] else "Resumed; next timer tick will check main")
